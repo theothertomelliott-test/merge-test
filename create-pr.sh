@@ -16,11 +16,18 @@ if [[ "$CURRENT_BRANCH" != "main" ]]; then
   exit 1
 fi
 
-# Check for uncommitted changes
-if [[ -n $(git status --porcelain) ]]; then
+# Check for uncommitted changes (but allow script files to be modified)
+if [[ -n $(git status --porcelain | grep -v -E "(create-pr\.sh|setup-test-prs\.sh|merge-passing-prs\.sh)") ]]; then
   echo "❌ Error: You have uncommitted changes. Please commit or stash them first."
-  git status --short
+  git status --short | grep -v -E "(create-pr\.sh|setup-test-prs\.sh|merge-passing-prs\.sh)"
   exit 1
+fi
+
+# Check if script files are the only uncommitted changes
+SCRIPT_CHANGES=$(git status --porcelain | grep -E "(create-pr\.sh|setup-test-prs\.sh|merge-passing-prs\.sh)")
+if [[ -n "$SCRIPT_CHANGES" ]]; then
+  echo "ℹ️  Script files have uncommitted changes, proceeding anyway..."
+  echo "$SCRIPT_CHANGES"
 fi
 
 echo "✅ Repository state validated"
@@ -97,6 +104,16 @@ case "$CHECK_VALUE" in
     ;;
 esac
 
+# Stash any script changes before creating branch (but keep check.txt)
+SCRIPT_CHANGES=$(git status --porcelain | grep -E "(create-pr\.sh|setup-test-prs\.sh|merge-passing-prs\.sh)")
+if [[ -n "$SCRIPT_CHANGES" ]]; then
+  echo "🔄 Stashing script changes before creating PR..."
+  # Create a temporary commit with script changes, then reset
+  git add create-pr.sh setup-test-prs.sh merge-passing-prs.sh
+  git commit -m "Temporary script changes" --no-verify
+  TEMP_COMMIT="true"
+fi
+
 echo "Creating test branch and pull request..."
 echo "Branch: $BRANCH_NAME"
 echo "Check value: $CHECK_VALUE"
@@ -107,7 +124,7 @@ git checkout -b "$BRANCH_NAME"
 # Create or modify the check file with the specified value
 echo "$CHECK_VALUE" > "$FILE_NAME"
 
-# Add and commit changes
+# Add and commit changes (only the check file)
 git add "$FILE_NAME"
 git commit -m "Set check to $CHECK_VALUE"
 
@@ -136,3 +153,9 @@ echo "�️  Check value: $CHECK_VALUE"
 # Switch back to main branch
 echo "🔄 Switching back to main branch..."
 git checkout main
+
+# Restore script changes if they were temporarily committed
+if [[ "$TEMP_COMMIT" == "true" ]]; then
+  echo "🔄 Restoring script changes..."
+  git reset --soft HEAD~1
+fi

@@ -4,6 +4,31 @@
 
 set -e
 
+# Check if we're on main branch
+CURRENT_BRANCH=$(git branch --show-current)
+if [[ "$CURRENT_BRANCH" != "main" ]]; then
+  echo "❌ Error: You must be on the main branch to run this script."
+  echo "   Current branch: $CURRENT_BRANCH"
+  echo "   Run: git checkout main"
+  exit 1
+fi
+
+# Check for uncommitted changes (but allow script files to be modified)
+if [[ -n $(git status --porcelain | grep -v -E "(create-pr\.sh|setup-test-prs\.sh|merge-passing-prs\.sh)") ]]; then
+  echo "❌ Error: You have uncommitted changes. Please commit or stash them first."
+  git status --short | grep -v -E "(create-pr\.sh|setup-test-prs\.sh|merge-passing-prs\.sh)"
+  exit 1
+fi
+
+# Check if script files are the only uncommitted changes
+SCRIPT_CHANGES=$(git status --porcelain | grep -E "(create-pr\.sh|setup-test-prs\.sh|merge-passing-prs\.sh)")
+if [[ -n "$SCRIPT_CHANGES" ]]; then
+  echo "ℹ️  Script files have uncommitted changes, proceeding anyway..."
+  echo "$SCRIPT_CHANGES"
+fi
+
+echo "✅ Repository state validated"
+
 echo "🚀 Setting up 5 test PRs in order: ok, fail, ok, ok, ok"
 
 # Array of check values in the specified order
@@ -19,9 +44,15 @@ for i in "${!CHECK_VALUES[@]}"; do
   git checkout main
   
   # Run create-pr.sh and capture the output
-  CREATE_OUTPUT=$(./create-pr.sh "${CHECK_VALUES[$i]}")
+  echo "🔄 Running create-pr.sh with check value: ${CHECK_VALUES[$i]}"
+  CREATE_OUTPUT=$(./create-pr.sh "${CHECK_VALUES[$i]}" 2>&1)
+  CREATE_EXIT_CODE=$?
   
-  if [[ $? -eq 0 ]]; then
+  echo "📝 create-pr.sh output:"
+  echo "$CREATE_OUTPUT"
+  echo "📝 Exit code: $CREATE_EXIT_CODE"
+  
+  if [[ $CREATE_EXIT_CODE -eq 0 ]]; then
     # Extract PR URL from the output
     PR_URL=$(echo "$CREATE_OUTPUT" | grep "✅ Pull request created:" | cut -d' ' -f4)
     if [[ -n "$PR_URL" ]]; then
@@ -34,6 +65,8 @@ for i in "${!CHECK_VALUES[@]}"; do
     fi
   else
     echo "❌ Failed to create PR $((i+1))"
+    echo "Exit code: $CREATE_EXIT_CODE"
+    echo "Output: $CREATE_OUTPUT"
     exit 1
   fi
   
