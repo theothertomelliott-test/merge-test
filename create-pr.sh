@@ -108,8 +108,17 @@ git checkout --force -b "$BRANCH_NAME"
 echo "$CHECK_VALUE" > "$FILE_NAME"
 echo "📝 Created $FILE_NAME with content: $CHECK_VALUE"
 
-# Add and commit changes
+# Force add the file even if unchanged
 git add "$FILE_NAME"
+
+# Check if there are changes to commit
+if git diff --cached --quiet; then
+  echo "ℹ️  No changes to $FILE_NAME, but continuing..."
+  # Create a dummy commit to ensure the branch has content
+  echo "Timestamp: $(date)" >> "$FILE_NAME"
+  git add "$FILE_NAME"
+fi
+
 git commit -m "Set check to $CHECK_VALUE"
 
 # Push branch to origin
