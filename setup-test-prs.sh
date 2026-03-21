@@ -15,6 +15,9 @@ for i in "${!CHECK_VALUES[@]}"; do
   echo ""
   echo "📋 Creating PR $((i+1))/5 with check value: ${CHECK_VALUES[$i]}"
   
+  # Ensure we're on main before creating each PR
+  git checkout main
+  
   # Run create-pr.sh and capture the output
   CREATE_OUTPUT=$(./create-pr.sh "${CHECK_VALUES[$i]}")
   
