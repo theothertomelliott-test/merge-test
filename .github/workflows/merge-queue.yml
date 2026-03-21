@@ -14,6 +14,53 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Read check configuration
+        id: check_config
+        run: |
+          if [[ -f "check.txt" ]]; then
+            CHECK_CONTENT=$(cat check.txt)
+            echo "content=$CHECK_CONTENT" >> $GITHUB_OUTPUT
+            echo "Check file content: $CHECK_CONTENT"
+          else
+            echo "content=ok" >> $GITHUB_OUTPUT
+            echo "No check.txt found, defaulting to ok"
+          fi
+      
+      - name: Evaluate check status
+        id: check_status
+        run: |
+          CHECK_CONTENT="${{ steps.check_config.outputs.content }}"
+          
+          if [[ "$CHECK_CONTENT" == "fail" ]]; then
+            echo "status=fail" >> $GITHUB_OUTPUT
+            echo "❌ Check configured to fail"
+          elif [[ "$CHECK_CONTENT" == "ok" ]]; then
+            echo "status=pass" >> $GITHUB_OUTPUT
+            echo "✅ Check configured to pass"
+          else
+            # Check if it's a timestamp
+            if [[ "$CHECK_CONTENT" =~ ^[0-9]+$ ]]; then
+              CURRENT_TIME=$(date +%s)
+              if [[ $CURRENT_TIME -ge $CHECK_CONTENT ]]; then
+                echo "status=pass" >> $GITHUB_OUTPUT
+                echo "✅ Timestamp passed, check will pass"
+              else
+                echo "status=fail" >> $GITHUB_OUTPUT
+                echo "❌ Timestamp not reached, check will fail"
+              fi
+            else
+              echo "status=fail" >> $GITHUB_OUTPUT
+              echo "❌ Invalid check.txt content, check will fail"
+            fi
+          fi
+      
       - name: Log current commit
         run: |
           echo "Current commit hash: $(git rev-parse HEAD)"
+          echo "Check status: ${{ steps.check_status.outputs.status }}"
+      
+      - name: Fail check if configured to fail
+        if: steps.check_status.outputs.status == 'fail'
+        run: |
+          echo "❌ Check failed as configured in check.txt"
+          exit 1
