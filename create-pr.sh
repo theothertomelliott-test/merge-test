@@ -36,8 +36,12 @@ if [[ $# -eq 0 ]]; then
 else
   INPUT_VALUE="$1"
   
+  # Validate merge_fail
+  if [[ "$INPUT_VALUE" == "merge_fail" ]]; then
+    CHECK_VALUE="$INPUT_VALUE"
+    echo "🔄 Will use merge_fail - passes individually, fails in merge queue"
   # Validate percentage format (number + %)
-  if [[ "$INPUT_VALUE" =~ ^([0-9]+)%$ ]]; then
+  elif [[ "$INPUT_VALUE" =~ ^([0-9]+)%$ ]]; then
     PERCENTAGE="${BASH_REMATCH[1]}"
     
     # Validate percentage range
@@ -73,7 +77,7 @@ fi
 
 # Validate check value
 case "$CHECK_VALUE" in
-  "ok"|"fail")
+  "ok"|"fail"|"merge_fail")
     ;;
   [0-9]*)
     # Timestamp validation - check if it's a reasonable future timestamp
@@ -92,7 +96,7 @@ case "$CHECK_VALUE" in
     ;;
   *)
     echo "❌ Error: Invalid check value '$INPUT_VALUE'"
-    echo "   Valid values: 'ok', 'fail', Unix timestamp, duration (e.g., 5m, 2h, 1d), or percentage (e.g., 20%)"
+    echo "   Valid values: 'ok', 'fail', 'merge_fail', Unix timestamp, duration (e.g., 5m, 2h, 1d), or percentage (e.g., 20%)"
     exit 1
     ;;
 esac
