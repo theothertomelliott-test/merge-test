@@ -4,6 +4,27 @@
 
 set -e
 
+# Validation checks
+echo "🔍 Validating repository state..."
+
+# Check if we're on main branch
+CURRENT_BRANCH=$(git branch --show-current)
+if [[ "$CURRENT_BRANCH" != "main" ]]; then
+  echo "❌ Error: You must be on the main branch to run this script."
+  echo "   Current branch: $CURRENT_BRANCH"
+  echo "   Run: git checkout main"
+  exit 1
+fi
+
+# Check for uncommitted changes
+if [[ -n $(git status --porcelain) ]]; then
+  echo "❌ Error: You have uncommitted changes. Please commit or stash them first."
+  git status --short
+  exit 1
+fi
+
+echo "✅ Repository state validated"
+
 # Configuration
 FILE_NAME="test-file.txt"
 BRANCH_NAME="test-branch-$(date +%s)"
