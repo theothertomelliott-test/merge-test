@@ -24,8 +24,8 @@ for i in "${!CHECK_VALUES[@]}"; do
   CREATE_EXIT_CODE=$?
   
   if [[ $CREATE_EXIT_CODE -eq 0 ]]; then
-    # Extract PR URL from the output
-    PR_URL=$(echo "$CREATE_OUTPUT" | grep "✅ Pull request created:" | cut -d' ' -f4)
+    # Extract PR URL from the output (handle line wrapping)
+    PR_URL=$(echo "$CREATE_OUTPUT" | grep "✅ Pull request created:" | sed 's/.*✅ Pull request created: //' | tr -d ' ')
     if [[ -n "$PR_URL" ]]; then
       PR_URLS[i]="$PR_URL"
       echo "✅ PR $((i+1)) created: $PR_URL"
