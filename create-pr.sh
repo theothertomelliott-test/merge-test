@@ -101,14 +101,24 @@ echo "Creating test branch and pull request..."
 echo "Branch: $BRANCH_NAME"
 echo "Check value: $CHECK_VALUE"
 
-# Create and switch to new branch
-git checkout -b "$BRANCH_NAME"
+# Create and switch to new branch (force to ignore script changes)
+git checkout --force -b "$BRANCH_NAME"
 
 # Create or modify the check file with the specified value
 echo "$CHECK_VALUE" > "$FILE_NAME"
+echo "📝 Created $FILE_NAME with content: $CHECK_VALUE"
 
-# Add and commit changes
+# Force add the file even if unchanged
 git add "$FILE_NAME"
+
+# Check if there are changes to commit
+if git diff --cached --quiet; then
+  echo "ℹ️  No changes to $FILE_VALUE, but continuing..."
+  # Create a dummy change to ensure the branch has content
+  echo "# Test PR with check value: $CHECK_VALUE" > "test-info.txt"
+  git add "test-info.txt"
+fi
+
 git commit -m "Set check to $CHECK_VALUE"
 
 # Push branch to origin
