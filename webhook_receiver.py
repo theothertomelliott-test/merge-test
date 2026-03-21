@@ -7,7 +7,7 @@ app = modal.App("merge-queue-webhook-receiver")
 
 # FastAPI endpoint for receiving webhooks
 @app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
-@modal.web_endpoint(method="POST")
+@modal.fastapi_endpoint(method="POST")
 def webhook_endpoint(request_data: Dict[str, Any]):
     """Receive webhook events and echo the body"""
     print("📡 Webhook received:")
