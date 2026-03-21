@@ -36,8 +36,12 @@ if [[ $# -eq 0 ]]; then
 else
   INPUT_VALUE="$1"
   
+  # Validate merge_fail
+  if [[ "$INPUT_VALUE" == "merge_fail" ]]; then
+    CHECK_VALUE="$INPUT_VALUE"
+    echo "🔄 Will use merge_fail - passes individually, fails in merge queue"
   # Validate percentage format (number + %)
-  if [[ "$INPUT_VALUE" =~ ^([0-9]+)%$ ]]; then
+  elif [[ "$INPUT_VALUE" =~ ^([0-9]+)%$ ]]; then
     PERCENTAGE="${BASH_REMATCH[1]}"
     
     # Validate percentage range
