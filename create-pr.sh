@@ -92,7 +92,7 @@ case "$CHECK_VALUE" in
     ;;
   *)
     echo "❌ Error: Invalid check value '$INPUT_VALUE'"
-    echo "   Valid values: 'ok', 'fail', Unix timestamp, duration (e.g., 5m, 2h, 1d), or percentage (e.g., 20%)"
+    echo "   Valid values: 'ok', 'fail', 'merge_fail', Unix timestamp, duration (e.g., 5m, 2h, 1d), or percentage (e.g., 20%)"
     exit 1
     ;;
 esac
