@@ -36,7 +36,7 @@ if [[ $# -eq 0 ]]; then
 else
   INPUT_VALUE="$1"
   
-  # Check if it's a percentage format (number + %)
+  # Validate percentage format (number + %)
   if [[ "$INPUT_VALUE" =~ ^([0-9]+)%$ ]]; then
     PERCENTAGE="${BASH_REMATCH[1]}"
     
@@ -47,18 +47,10 @@ else
       exit 1
     fi
     
-    # Generate random number between 1-100
-    RANDOM_NUM=$((RANDOM % 100 + 1))
+    CHECK_VALUE="$INPUT_VALUE"
+    echo "🎲 Will use percentage $INPUT_VALUE during workflow run"
     
-    if [[ $RANDOM_NUM -le $PERCENTAGE ]]; then
-      CHECK_VALUE="ok"
-      echo "🎲 Percentage $INPUT_VALUE: Roll $RANDOM_NUM ≤ $PERCENTAGE = PASS"
-    else
-      CHECK_VALUE="fail"
-      echo "🎲 Percentage $INPUT_VALUE: Roll $RANDOM_NUM > $PERCENTAGE = FAIL"
-    fi
-    
-  # Check if it's a duration format (number + unit)
+  # Validate duration format (number + unit)
   elif [[ "$INPUT_VALUE" =~ ^([0-9]+)([smhd])$ ]]; then
     DURATION_NUM="${BASH_REMATCH[1]}"
     DURATION_UNIT="${BASH_REMATCH[2]}"

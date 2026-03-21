@@ -38,8 +38,21 @@ jobs:
             echo "status=pass" >> $GITHUB_OUTPUT
             echo "✅ Check configured to pass"
           else
+            # Check if it's a percentage format (number + %)
+            if [[ "$CHECK_CONTENT" =~ ^([0-9]+)%$ ]]; then
+              PERCENTAGE="${BASH_REMATCH[1]}"
+              # Generate random number between 1-100
+              RANDOM_NUM=$((RANDOM % 100 + 1))
+              
+              if [[ $RANDOM_NUM -le $PERCENTAGE ]]; then
+                echo "status=pass" >> $GITHUB_OUTPUT
+                echo "🎲 Percentage $CHECK_CONTENT: Roll $RANDOM_NUM ≤ $PERCENTAGE = PASS"
+              else
+                echo "status=fail" >> $GITHUB_OUTPUT
+                echo "🎲 Percentage $CHECK_CONTENT: Roll $RANDOM_NUM > $PERCENTAGE = FAIL"
+              fi
             # Check if it's a timestamp
-            if [[ "$CHECK_CONTENT" =~ ^[0-9]+$ ]]; then
+            elif [[ "$CHECK_CONTENT" =~ ^[0-9]+$ ]]; then
               CURRENT_TIME=$(date +%s)
               if [[ $CURRENT_TIME -ge $CHECK_CONTENT ]]; then
                 echo "status=pass" >> $GITHUB_OUTPUT
