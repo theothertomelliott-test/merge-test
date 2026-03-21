@@ -19,9 +19,11 @@ for i in "${!CHECK_VALUES[@]}"; do
   git checkout main
   
   # Run create-pr.sh and capture the output
-  CREATE_OUTPUT=$(./create-pr.sh "${CHECK_VALUES[$i]}")
+  echo "🔄 Running create-pr.sh with check value: ${CHECK_VALUES[$i]}"
+  CREATE_OUTPUT=$(./create-pr.sh "${CHECK_VALUES[$i]}" 2>&1)
+  CREATE_EXIT_CODE=$?
   
-  if [[ $? -eq 0 ]]; then
+  if [[ $CREATE_EXIT_CODE -eq 0 ]]; then
     # Extract PR URL from the output
     PR_URL=$(echo "$CREATE_OUTPUT" | grep "✅ Pull request created:" | cut -d' ' -f4)
     if [[ -n "$PR_URL" ]]; then
@@ -34,6 +36,8 @@ for i in "${!CHECK_VALUES[@]}"; do
     fi
   else
     echo "❌ Failed to create PR $((i+1))"
+    echo "Exit code: $CREATE_EXIT_CODE"
+    echo "Output: $CREATE_OUTPUT"
     exit 1
   fi
   

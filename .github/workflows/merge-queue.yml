@@ -18,7 +18,7 @@ jobs:
         id: check_config
         run: |
           if [[ -f "check.txt" ]]; then
-            CHECK_CONTENT=$(cat check.txt)
+            CHECK_CONTENT=$(head -n 1 check.txt)
             echo "content=$CHECK_CONTENT" >> $GITHUB_OUTPUT
             echo "Check file content: $CHECK_CONTENT"
           else
