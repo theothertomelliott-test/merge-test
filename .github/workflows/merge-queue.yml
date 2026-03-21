@@ -133,7 +133,7 @@ jobs:
             "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
             "repository": "${{ github.repository }}",
             "commit_sha": "${{ github.sha }}",
-            "pr_number": $PR_NUMBER,
+            "pr_number": ${PR_NUMBER:-null},
             "additional_info": {
               "workflow_run_id": "${{ github.run_id }}",
               "github_event": "${{ github.event_name }}",
