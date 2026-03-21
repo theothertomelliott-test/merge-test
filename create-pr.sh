@@ -113,7 +113,7 @@ git add "$FILE_NAME"
 
 # Check if there are changes to commit
 if git diff --cached --quiet; then
-  echo "ℹ️  No changes to $FILE_VALUE, but continuing..."
+  echo "ℹ️  No changes to $FILE_NAME, but continuing..."
   # Create a dummy change to ensure the branch has content
   echo "# Test PR with check value: $CHECK_VALUE" > "test-info.txt"
   git add "test-info.txt"
