@@ -108,18 +108,17 @@ git checkout --force -b "$BRANCH_NAME"
 echo "$CHECK_VALUE" > "$FILE_NAME"
 echo "📝 Created $FILE_NAME with content: $CHECK_VALUE"
 
-# Force add the file even if unchanged
+# Force add the file and ensure it's always committed
 git add "$FILE_NAME"
 
-# Check if there are changes to commit
+# Always commit the check.txt file, even if unchanged
+# This ensures each PR has a clean check.txt state
 if git diff --cached --quiet; then
-  echo "ℹ️  No changes to $FILE_NAME, but continuing..."
-  # Create a dummy change to ensure the branch has content
-  echo "# Test PR with check value: $CHECK_VALUE" > "test-info.txt"
-  git add "test-info.txt"
+  echo "ℹ️  No changes to $FILE_NAME, but forcing commit..."
+  git commit --allow-empty -m "Set check to $CHECK_VALUE"
+else
+  git commit -m "Set check to $CHECK_VALUE"
 fi
-
-git commit -m "Set check to $CHECK_VALUE"
 
 # Push branch to origin
 git push -u origin "$BRANCH_NAME"
