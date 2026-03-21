@@ -77,7 +77,7 @@ fi
 
 # Validate check value
 case "$CHECK_VALUE" in
-  "ok"|"fail")
+  "ok"|"fail"|"merge_fail")
     ;;
   [0-9]*)
     # Timestamp validation - check if it's a reasonable future timestamp
