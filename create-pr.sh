@@ -68,3 +68,7 @@ echo "✅ Pull request created: $PR_URL"
 echo "🔀 Branch: $BRANCH_NAME"
 echo "📝 File modified: $FILE_NAME"
 echo "🎲 Random value: $RANDOM_VALUE"
+
+# Switch back to main branch
+echo "🔄 Switching back to main branch..."
+git checkout main
