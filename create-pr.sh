@@ -36,8 +36,30 @@ if [[ $# -eq 0 ]]; then
 else
   INPUT_VALUE="$1"
   
+  # Check if it's a percentage format (number + %)
+  if [[ "$INPUT_VALUE" =~ ^([0-9]+)%$ ]]; then
+    PERCENTAGE="${BASH_REMATCH[1]}"
+    
+    # Validate percentage range
+    if [[ $PERCENTAGE -lt 0 || $PERCENTAGE -gt 100 ]]; then
+      echo "❌ Error: Percentage must be between 0 and 100"
+      echo "   Provided: $PERCENTAGE%"
+      exit 1
+    fi
+    
+    # Generate random number between 1-100
+    RANDOM_NUM=$((RANDOM % 100 + 1))
+    
+    if [[ $RANDOM_NUM -le $PERCENTAGE ]]; then
+      CHECK_VALUE="ok"
+      echo "🎲 Percentage $INPUT_VALUE: Roll $RANDOM_NUM ≤ $PERCENTAGE = PASS"
+    else
+      CHECK_VALUE="fail"
+      echo "🎲 Percentage $INPUT_VALUE: Roll $RANDOM_NUM > $PERCENTAGE = FAIL"
+    fi
+    
   # Check if it's a duration format (number + unit)
-  if [[ "$INPUT_VALUE" =~ ^([0-9]+)([smhd])$ ]]; then
+  elif [[ "$INPUT_VALUE" =~ ^([0-9]+)([smhd])$ ]]; then
     DURATION_NUM="${BASH_REMATCH[1]}"
     DURATION_UNIT="${BASH_REMATCH[2]}"
     CURRENT_TIME=$(date +%s)
@@ -78,7 +100,7 @@ case "$CHECK_VALUE" in
     ;;
   *)
     echo "❌ Error: Invalid check value '$INPUT_VALUE'"
-    echo "   Valid values: 'ok', 'fail', Unix timestamp, or duration (e.g., 5m, 2h, 1d)"
+    echo "   Valid values: 'ok', 'fail', Unix timestamp, duration (e.g., 5m, 2h, 1d), or percentage (e.g., 20%)"
     exit 1
     ;;
 esac
