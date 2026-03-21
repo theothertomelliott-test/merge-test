@@ -1,9 +1,15 @@
-name: Checks
+name: Merge Queue Check
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main ]
   pull_request:
+    branches: [ main ]
   merge_group:
+    types: [checks_requested]
+
+env:
+  WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
 
 jobs:
   check:
@@ -36,9 +42,11 @@ jobs:
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
             echo "🔄 Running in merge group context"
             IS_MERGE_GROUP="true"
+            CONTEXT="merge_group"
           else
             echo "🔍 Running in individual PR context"
             IS_MERGE_GROUP="false"
+            CONTEXT="individual"
           fi
           
           # Handle merge-group-specific check
@@ -46,17 +54,21 @@ jobs:
             if [[ "$IS_MERGE_GROUP" == "true" ]]; then
               echo "status=fail" >> $GITHUB_OUTPUT
               echo "❌ merge_fail: Fails in merge group context"
+              CHECK_STATUS="fail"
             else
               echo "status=pass" >> $GITHUB_OUTPUT
               echo "✅ merge_fail: Passes in individual PR context"
+              CHECK_STATUS="pass"
             fi
           # Handle regular ok/fail
           elif [[ "$CHECK_CONTENT" == "ok" ]]; then
             echo "status=pass" >> $GITHUB_OUTPUT
             echo "✅ Check will pass"
+            CHECK_STATUS="pass"
           elif [[ "$CHECK_CONTENT" == "fail" ]]; then
             echo "status=fail" >> $GITHUB_OUTPUT
             echo "❌ Check will fail"
+            CHECK_STATUS="fail"
           # Check if it's a percentage format (number + %)
           elif [[ "$CHECK_CONTENT" =~ ^([0-9]+)%$ ]]; then
             PERCENTAGE="${BASH_REMATCH[1]}"
@@ -66,9 +78,11 @@ jobs:
             if [[ $RANDOM_NUM -le $PERCENTAGE ]]; then
               echo "status=pass" >> $GITHUB_OUTPUT
               echo "🎲 Percentage $CHECK_CONTENT: Roll $RANDOM_NUM ≤ $PERCENTAGE = PASS"
+              CHECK_STATUS="pass"
             else
               echo "status=fail" >> $GITHUB_OUTPUT
               echo "🎲 Percentage $CHECK_CONTENT: Roll $RANDOM_NUM > $PERCENTAGE = FAIL"
+              CHECK_STATUS="fail"
             fi
           # Check if it's a timestamp
           elif [[ "$CHECK_CONTENT" =~ ^[0-9]+$ ]]; then
@@ -76,14 +90,71 @@ jobs:
             if [[ $CURRENT_TIME -ge $CHECK_CONTENT ]]; then
               echo "status=pass" >> $GITHUB_OUTPUT
               echo "✅ Timestamp passed, check will pass"
+              CHECK_STATUS="pass"
             else
               echo "status=fail" >> $GITHUB_OUTPUT
               echo "❌ Timestamp not reached, check will fail"
+              CHECK_STATUS="fail"
             fi
           else
             echo "status=fail" >> $GITHUB_OUTPUT
             echo "❌ Invalid check.txt content, check will fail"
+            CHECK_STATUS="fail"
           fi
+          
+          # Export variables for webhook
+          echo "CHECK_STATUS=$CHECK_STATUS" >> $GITHUB_ENV
+          echo "CONTEXT=$CONTEXT" >> $GITHUB_ENV
+      
+      - name: Send webhook event
+        if: env.WEBHOOK_URL != ''
+        run: |
+          # Get branch name
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            BRANCH_NAME="${{ github.event.merge_group.head_ref }}"
+          else
+            BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+          fi
+          
+          # Get PR number if available
+          PR_NUMBER=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+          
+          # Prepare webhook payload
+          PAYLOAD=$(cat << EOF
+          {
+            "event_type": "check_evaluation",
+            "branch_name": "$BRANCH_NAME",
+            "check_content": "${{ steps.check_config.outputs.content }}",
+            "check_status": "$CHECK_STATUS",
+            "context": "$CONTEXT",
+            "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "repository": "${{ github.repository }}",
+            "commit_sha": "${{ github.sha }}",
+            "pr_number": $PR_NUMBER,
+            "additional_info": {
+              "workflow_run_id": "${{ github.run_id }}",
+              "github_event": "${{ github.event_name }}",
+              "actor": "${{ github.actor }}"
+            }
+          }
+          EOF
+          )
+          
+          echo "📡 Sending webhook event..."
+          echo "Branch: $BRANCH_NAME"
+          echo "Check: ${{ steps.check_config.outputs.content }} -> $CHECK_STATUS"
+          echo "Context: $CONTEXT"
+          
+          # Send webhook
+          RESPONSE=$(curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$WEBHOOK_URL")
+          
+          echo "📡 Webhook response: $RESPONSE"
       
       - name: Log current commit
         run: |
