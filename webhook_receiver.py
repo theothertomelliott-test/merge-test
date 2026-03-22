@@ -134,6 +134,27 @@ async def github_webhook(request: Request):
             import json as json_lib
             actions_list = json_lib.loads(existing_actions)
             
+            # Ensure we have PR data - fetch from GitHub API if missing
+            pr_data_json = pr_data_store.get(pr_id, "{}")
+            pr_data = json_lib.loads(pr_data_json)
+            
+            if not pr_data.get("title"):  # If we don't have PR data, fetch it
+                print(f"🔍 Missing PR data for #{pr_id}, fetching from GitHub API...")
+                try:
+                    import subprocess
+                    result = subprocess.run(
+                        ["gh", "pr", "view", pr_id, "--json", "title,state,user,head,base"],
+                        capture_output=True, text=True, check=True
+                    )
+                    pr_data = json_lib.loads(result.stdout)
+                    pr_data_store[pr_id] = json_lib.dumps(pr_data)
+                    print(f"🔍 Fetched PR data for #{pr_id}: {pr_data.get('title', 'Unknown')}")
+                except Exception as e:
+                    print(f"❌ Failed to fetch PR data for #{pr_id}: {e}")
+                    # Use minimal data to avoid crashes
+                    pr_data = {"title": f"PR #{pr_id}", "state": "unknown", "user": {"login": "unknown"}}
+                    pr_data_store[pr_id] = json_lib.dumps(pr_data)
+            
             # Add new action
             new_action = {
                 "action": action,
@@ -232,6 +253,27 @@ async def github_webhook(request: Request):
                 existing_actions = pr_actions.get(pr_id, "[]")
                 import json as json_lib
                 actions_list = json_lib.loads(existing_actions)
+                
+                # Ensure we have PR data - fetch from GitHub API if missing
+                pr_data_json = pr_data_store.get(pr_id, "{}")
+                pr_data = json_lib.loads(pr_data_json)
+                
+                if not pr_data.get("title"):  # If we don't have PR data, fetch it
+                    print(f"🔍 Missing PR data for #{pr_id} in workflow, fetching from GitHub API...")
+                    try:
+                        import subprocess
+                        result = subprocess.run(
+                            ["gh", "pr", "view", pr_id, "--json", "title,state,user,head,base"],
+                            capture_output=True, text=True, check=True
+                        )
+                        pr_data = json_lib.loads(result.stdout)
+                        pr_data_store[pr_id] = json_lib.dumps(pr_data)
+                        print(f"🔍 Fetched PR data for #{pr_id}: {pr_data.get('title', 'Unknown')}")
+                    except Exception as e:
+                        print(f"❌ Failed to fetch PR data for #{pr_id}: {e}")
+                        # Use minimal data to avoid crashes
+                        pr_data = {"title": f"PR #{pr_id}", "state": "unknown", "user": {"login": "unknown"}}
+                        pr_data_store[pr_id] = json_lib.dumps(pr_data)
                 
                 # Add new workflow action
                 # Use workflow run ID from payload if available, otherwise create timestamp-based ID
