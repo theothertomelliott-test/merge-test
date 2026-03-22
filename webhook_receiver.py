@@ -423,6 +423,11 @@ def get_build_counts():
                         status = action.get('workflow_status', 'unknown')
                         conclusion = action.get('workflow_conclusion', '')
                         
+                        # Skip intermediate workflow stages (queued, in_progress)
+                        # Only show completed workflows with success/failure
+                        if status not in ['completed'] and conclusion not in ['success', 'failure', 'cancelled', 'timed_out']:
+                            continue  # Skip this action, don't display it
+                        
                         # Extract action type using multiple methods
                         action_type = "unknown"
                         status = action.get('workflow_status', 'unknown')
@@ -448,7 +453,9 @@ def get_build_counts():
                             elif "'action': 'completed'" in action_str or '"action": "completed"' in action_str or "completed" in action_str:
                                 action_type = "completed"
                         
-                        action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({status}"
+                        # Show workflow with final status
+                        final_status = conclusion if conclusion in ['success', 'failure', 'cancelled', 'timed_out'] else status
+                        action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({final_status})"
                         
                         if conclusion:
                             action_line += f" - {conclusion}"
