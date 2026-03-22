@@ -40,9 +40,6 @@ def calculate_queue_metrics(actions_list, pr_data=None):
         elif action.get("action") == "dequeued":
             dequeue_action = action
     
-    # Debug: Check what we found
-    print(f"🔍 Debug: Found enqueue: {bool(enqueue_action)}, dequeue: {bool(dequeue_action)}")
-    
     # Calculate metrics only if both actions exist
     if not enqueue_action or not dequeue_action:
         return None
@@ -56,22 +53,6 @@ def calculate_queue_metrics(actions_list, pr_data=None):
         # Calculate duration between enqueue and dequeue
         queue_duration_seconds = (dequeue_time - enqueue_time).total_seconds()
         
-        # Calculate duration between merged_at and dequeue if PR data available
-        pr_duration_seconds = None
-        if pr_data and pr_data.get("merged_at"):
-            # Parse GitHub timestamp (convert Z to +00:00 for ISO format)
-            merged_time_str = pr_data["merged_at"].replace("Z", "+00:00")
-            merged_time = datetime.fromisoformat(merged_time_str)
-            pr_duration_seconds = (dequeue_time - merged_time).total_seconds()
-            print(f"🔍 PR Duration Debug:")
-            print(f"  Merged at: {pr_data['merged_at']}")
-            print(f"  Dequeue time: {dequeue_time}")
-            print(f"  PR duration: {pr_duration_seconds}s")
-        else:
-            print(f"🔍 PR Duration Debug: No merged_at in PR data")
-            print(f"  PR data keys: {list(pr_data.keys()) if pr_data else 'None'}")
-            print(f"  Has merged_at: {pr_data.get('merged_at') if pr_data else 'N/A'}")
-        
         # Classify result based on PR state at dequeue
         state_at_dequeue = dequeue_action.get("state", "unknown")
         if state_at_dequeue == "closed":
@@ -81,19 +62,12 @@ def calculate_queue_metrics(actions_list, pr_data=None):
         else:
             result = "unknown"
         
-        metrics = {
+        return {
             "queue_duration_seconds": round(queue_duration_seconds, 2),
             "queue_duration_formatted": f"{queue_duration_seconds:.1f}s",
             "result": result,
             "state_at_dequeue": state_at_dequeue
         }
-        
-        # Add PR duration if available
-        if pr_duration_seconds is not None:
-            metrics["pr_duration_seconds"] = round(pr_duration_seconds, 2)
-            metrics["pr_duration_formatted"] = f"{pr_duration_seconds:.1f}s"
-        
-        return metrics
         
     except Exception as e:
         print(f"Error calculating queue metrics: {e}")
@@ -188,21 +162,19 @@ async def github_webhook(request: Request):
                 print(f"🔍 GET Debug PR #{pr_id}:")
                 print(f"  Actions count: {len(actions)}")
                 print(f"  PR data available: {bool(pr_data)}")
-                print(f"  Merged at in PR data: {pr_data.get('merged_at') if pr_data else 'N/A'}")
                 print(f"  Queue metrics: {queue_metrics}")
-            
-            # Debug logging
-            if any(action['action'] == 'dequeued' for action in actions_list):
-                print(f"� Debug PR #{pr_id}:")
-                print(f"  Actions count: {len(actions_list)}")
-        
-                print(f"  Merged at in PR data: {pr_data.get('merged_at') if pr_data else 'N/A'}")
-                print(f"  Queue metrics: {queue_metrics}")
-                if queue_metrics:
-                    print(f"📊 Queue Metrics:")
-                    print(f"  Enqueue->Dequeue: {queue_metrics['queue_duration_formatted']}")
-                    if queue_metrics.get('pr_duration_formatted'):
-                        print(f"  Merged->Dequeue: {queue_metrics['pr_duration_formatted']}")
+                
+                # Look for timing data in the webhook payload
+                print("🔍 Looking for timing data in payload:")
+                for key in ["queued_at", "enqueued_at", "merge_queue_entry", "reason"]:
+                    if key in payload:
+                        print(f"  {key}: {payload[key]}")
+                
+                # Check PR data for timing fields
+                print("🔍 PR data timing fields:")
+                for key in ["created_at", "updated_at", "merged_at", "closed_at"]:
+                    if key in pr_data:
+                        print(f"  {key}: {pr_data[key]}")
             
         elif payload.get("workflow_run"):
             # Ignore workflow run events
@@ -318,8 +290,6 @@ def get_build_counts():
                 # Add queue metrics to dequeue action
                 if action['action'] == 'dequeued' and queue_metrics:
                     metrics_text = queue_metrics['queue_duration_formatted']
-                    if queue_metrics.get('pr_duration_formatted'):
-                        metrics_text += f", PR: {queue_metrics['pr_duration_formatted']}"
                     action_line += f" [{metrics_text}, {queue_metrics['result']}]"
                 
                 lines.append(action_line)
