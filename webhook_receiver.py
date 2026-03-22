@@ -5,8 +5,11 @@ from typing import Dict, Any
 # Modal app for receiving webhook events
 app = modal.App("merge-queue-webhook-receiver")
 
+# Modal Dict to store build counts per branch
+build_counts = modal.Dict.from_name("branch-build-counts", create_if_missing=True)
+
 # FastAPI endpoint for receiving webhooks
-@app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
+@app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]), max_containers=1)
 @modal.fastapi_endpoint(method="POST")
 def webhook_endpoint(request_data: Dict[str, Any]):
     """Receive webhook events and echo the body"""
@@ -18,6 +21,21 @@ def webhook_endpoint(request_data: Dict[str, Any]):
     if isinstance(request_data, dict):
         print("✅ Request is a dictionary")
         print(json.dumps(request_data, indent=2))
+        
+        # Update build count for this branch
+        # Note: Modal Dict doesn't have built-in atomic operations, so there's a small race condition risk
+        # For high-concurrency scenarios, consider using a database with proper transactions
+        branch_name = request_data.get("branch_name", "unknown")
+        build_counts[branch_name] = build_counts.get(branch_name, 0) + 1
+        new_count = build_counts[branch_name]
+        
+        print(f"📊 Branch '{branch_name}' build count: {new_count}")
+        
+        # Print all build counts
+        print("📈 All branch build counts:")
+        for branch, count in build_counts.items():
+            print(f"   {branch}: {count}")
+            
     else:
         print(f"⚠️  Unexpected request format: {type(request_data)}")
         try:
@@ -35,5 +53,30 @@ def webhook_endpoint(request_data: Dict[str, Any]):
     return {
         "status": "success",
         "echo": request_data,
-        "received_type": str(type(request_data))
+        "received_type": str(type(request_data)),
+        "build_counts": dict(build_counts.items())
+    }
+
+# Endpoint to view build counts
+@app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
+@modal.fastapi_endpoint(method="GET")
+def get_build_counts():
+    """Get all build counts"""
+    counts_dict = dict(build_counts.items())
+    return {
+        "status": "success",
+        "build_counts": counts_dict,
+        "total_branches": len(counts_dict),
+        "total_builds": sum(counts_dict.values())
+    }
+
+# Endpoint to clear build counts
+@app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
+@modal.fastapi_endpoint(method="DELETE")
+def clear_build_counts():
+    """Clear all build counts"""
+    build_counts.clear()
+    return {
+        "status": "success",
+        "message": "All build counts cleared"
     }
