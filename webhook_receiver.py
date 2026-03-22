@@ -125,6 +125,9 @@ async def github_webhook(request: Request):
             pr_id = str(pr_data["number"])
             action = payload.get("action", "unknown")
             
+            # CRITICAL DEBUG: Log ALL PR webhook events immediately
+            print(f"🚨 PR WEBHOOK RECEIVED - PR #{pr_id}, Action: {action}")
+            
             # Debug: Log all PR webhook events
             print(f"🔍 PR Webhook Event - PR #{pr_id}, Action: {action}, Timestamp: {datetime.datetime.now().isoformat()}")
             
