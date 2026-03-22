@@ -405,14 +405,17 @@ def get_build_counts():
         import json as json_lib
         try:
             actions = json_lib.loads(actions_json)
-            lines.append(f"PR #{pr_id}:")
             
-            # Get PR data for metrics calculation
+            # Get PR data for title and metrics calculation
             pr_data_json = pr_data_store.get(pr_id, "{}")
             pr_data = json_lib.loads(pr_data_json)
+            pr_title = pr_data.get("title", "Unknown Title")
             
             # Calculate queue metrics for this PR with stored PR data
             queue_metrics = calculate_queue_metrics(actions, pr_data)
+            
+            # Display PR header with title
+            lines.append(f"PR #{pr_id}: {pr_title}")
             
             for action in actions:
                 # Handle different action types
@@ -488,11 +491,6 @@ def get_build_counts():
                         action_line += f" [{metrics_text}, {queue_metrics['result']}]"
                 
                 lines.append(action_line)
-                lines.append(f"    Title: {action['title']}")
-                
-                # Only show branches for PR actions, not workflow actions
-                if not (action['action'].startswith('workflow_') or action['action'].startswith('job_')):
-                    lines.append(f"    Branches: {action['head_branch']} -> {action['base_branch']}")
             lines.append("")
         except:
             lines.append(f"PR #{pr_id}: [Invalid data]")
