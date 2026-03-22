@@ -337,6 +337,44 @@ async def github_webhook(request: Request):
             
             return {"status": "success", "message": "Workflow job received"}
 
+        # Handle custom check_evaluation webhook from workflow
+        elif payload.get("event_type") == "check_evaluation":
+            event_type = "check_evaluation"
+            branch_name = payload.get("branch_name", "")
+            base_branch = payload.get("base_branch", "main")
+            check_content = payload.get("check_content", "")
+            check_status = payload.get("check_status", "")
+            context = payload.get("context", "")
+            commits = payload.get("commits", [])
+            pr_number = payload.get("pr_number")
+            timestamp = payload.get("timestamp", "")
+            
+            print(f"🔍 Check Evaluation - Branch: {branch_name}, Status: {check_status}, Commits: {len(commits)}")
+            
+            # Update build counts with commit information
+            current_count = build_counts.get(branch_name, "0")
+            new_count = int(current_count) + 1
+            build_counts[branch_name] = str(new_count)
+            
+            # Store additional build information including commits
+            build_info = {
+                "branch_name": branch_name,
+                "base_branch": base_branch,
+                "check_content": check_content,
+                "check_status": check_status,
+                "context": context,
+                "commits": commits,
+                "pr_number": pr_number,
+                "timestamp": timestamp,
+                "build_count": new_count
+            }
+            
+            # Store build info with a key that includes the branch and count
+            build_key = f"{branch_name}_build_{new_count}"
+            build_counts[build_key] = json_lib.dumps(build_info)
+            
+            print(f"📊 Updated build count for {branch_name}: {new_count} (with {len(commits)} commits)")
+
         print("Action:", payload.get("action"), "Type:", event_type)
         
         return {"status": "success", "message": f"{event_type} event received"}
@@ -417,7 +455,30 @@ def get_build_counts():
     # Build counts section
     lines.append("=== BUILD COUNTS ===")
     for branch, count in sorted_builds:
+        # Skip build info keys (they contain _build_)
+        if "_build_" in branch:
+            continue
         lines.append(f"{branch}: {count}")
+        
+        # Look for build info for this branch
+        build_info_key = f"{branch}_build_{count}"
+        if build_info_key in build_counts_dict:
+            try:
+                build_info = json_lib.loads(build_counts_dict[build_info_key])
+                commits = build_info.get("commits", [])
+                pr_number = build_info.get("pr_number")
+                check_status = build_info.get("check_status", "")
+                
+                if commits:
+                    lines.append(f"  └─ PR #{pr_number} - {check_status.upper()}")
+                    for i, commit in enumerate(commits[:5], 1):  # Show max 5 commits
+                        lines.append(f"     {i}. {commit}")
+                    if len(commits) > 5:
+                        lines.append(f"     ... and {len(commits) - 5} more")
+                elif pr_number:
+                    lines.append(f"  └─ PR #{pr_number} - {check_status.upper()}")
+            except Exception as e:
+                print(f"❌ Failed to parse build info for {branch}: {e}")
     
     lines.append("")
     

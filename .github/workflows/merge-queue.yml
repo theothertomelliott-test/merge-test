@@ -112,8 +112,10 @@ jobs:
           # Get branch name
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
             BRANCH_NAME="${{ github.event.merge_group.head_ref }}"
+            BASE_BRANCH="main"
           else
             BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
+            BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           fi
           
           # Get PR number if available
@@ -122,11 +124,31 @@ jobs:
             PR_NUMBER="${{ github.event.pull_request.number }}"
           fi
           
+          # Get commit titles between base and head
+          echo "🔍 Getting commits between $BASE_BRANCH and $BRANCH_NAME..."
+          COMMITS_JSON="[]"
+          
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            # For merge groups, get commits in the merge group
+            COMMITS=$(git log --pretty=format:'"%s"' $BASE_BRANCH..$BRANCH_NAME | head -10)
+          else
+            # For individual PRs, get commits in the PR
+            COMMITS=$(git log --pretty=format:'"%s"' $BASE_BRANCH..$BRANCH_NAME | head -10)
+          fi
+          
+          # Convert commits to JSON array
+          if [[ -n "$COMMITS" ]]; then
+            COMMITS_JSON=$(echo "$COMMITS" | jq -R . | jq -s .)
+          fi
+          
+          echo "📝 Found commits: $COMMITS_JSON"
+          
           # Prepare webhook payload
           PAYLOAD=$(cat << EOF
           {
             "event_type": "check_evaluation",
             "branch_name": "$BRANCH_NAME",
+            "base_branch": "$BASE_BRANCH",
             "check_content": "${{ steps.check_config.outputs.content }}",
             "check_status": "$CHECK_STATUS",
             "context": "$CONTEXT",
@@ -134,6 +156,7 @@ jobs:
             "repository": "${{ github.repository }}",
             "commit_sha": "${{ github.sha }}",
             "pr_number": ${PR_NUMBER:-null},
+            "commits": $COMMITS_JSON,
             "additional_info": {
               "workflow_run_id": "${{ github.run_id }}",
               "github_event": "${{ github.event_name }}",
@@ -144,9 +167,10 @@ jobs:
           )
           
           echo "📡 Sending webhook event..."
-          echo "Branch: $BRANCH_NAME"
+          echo "Branch: $BRANCH_NAME (from $BASE_BRANCH)"
           echo "Check: ${{ steps.check_config.outputs.content }} -> $CHECK_STATUS"
           echo "Context: $CONTEXT"
+          echo "Commits: $(echo $COMMITS_JSON | jq 'length') found"
           
           # Send webhook
           RESPONSE=$(curl -s -X POST \
