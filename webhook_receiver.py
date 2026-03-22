@@ -34,17 +34,18 @@ def verify_signature(payload_body: bytes, secret_token: str, signature_header: s
 # FastAPI endpoint for receiving webhooks
 @app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]), max_containers=1, secrets=[webhook_secret])
 @modal.fastapi_endpoint(method="POST")
-def github_webhook(request: Request):
+async def github_webhook(request: Request):
     """Receive GitHub webhooks with signature validation"""
     try:
         # Get signature from header
         signature_header = request.headers.get("x-hub-signature-256")
         
-        # Get raw request body
-        body = request.body()
+        # Get raw request body (await the coroutine)
+        body = await request.body()
         
-        # Get secret from Modal secrets
-        secret_token = webhook_secret["WEBHOOK_SECRET"]
+        # Get secret from Modal secrets environment variable
+        import os
+        secret_token = os.environ["WEBHOOK_SECRET"]
         
         # Verify signature
         verify_signature(body, secret_token, signature_header)
