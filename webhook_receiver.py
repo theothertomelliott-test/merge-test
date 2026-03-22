@@ -441,28 +441,30 @@ def get_build_counts():
                         status = action.get('workflow_status', 'unknown')
                         conclusion = action.get('workflow_conclusion', '')
                         
-                        # Extract action type (requested, in_progress, completed) from the malformed action string
+                        # Extract action type using multiple methods
                         action_type = "unknown"
-                        action_str = action['action'].lower()
+                        status = action.get('workflow_status', 'unknown')
+                        conclusion = action.get('workflow_conclusion', '')
                         
-                        # Debug: Print the actual action string for analysis
-                        print(f"🔍 Action Debug - String: {action_str[:100]}...")  # First 100 chars
-                        
-                        # The action string might contain the full dictionary, so look for patterns
-                        if "'action': 'requested'" in action_str or '"action": "requested"' in action_str:
-                            action_type = "requested"
-                        elif "'action': 'in_progress'" in action_str or '"action": "in_progress"' in action_str:
-                            action_type = "in_progress" 
-                        elif "'action': 'completed'" in action_str or '"action": "completed"' in action_str:
-                            action_type = "completed"
-                        elif "requested" in action_str and "queued" in action_str:
-                            action_type = "requested"  # queued maps to requested
-                        elif "in_progress" in action_str or "progress" in action_str:
-                            action_type = "in_progress"  # partial match
-                        elif ("completed" in action_str or "success" in action_str or "failure" in action_str) and "workflow" in action_str:
-                            action_type = "completed"  # conclusion indicates completion
-                        
-                        print(f"🔍 Action Debug - Extracted: {action_type}")  # Debug output
+                        # Method 1: Use workflow_status if available
+                        if status == 'queued':
+                            action_type = 'requested'
+                        elif status == 'in_progress':
+                            action_type = 'in_progress'
+                        elif status == 'completed':
+                            action_type = 'completed'
+                        # Method 2: Use conclusion to infer completed status
+                        elif conclusion in ['success', 'failure', 'cancelled', 'timed_out']:
+                            action_type = 'completed'
+                        # Method 3: Parse the malformed action string
+                        else:
+                            action_str = action['action'].lower()
+                            if "'action': 'requested'" in action_str or '"action": "requested"' in action_str or "requested" in action_str:
+                                action_type = "requested"
+                            elif "'action': 'in_progress'" in action_str or '"action": "in_progress"' in action_str or "in_progress" in action_str:
+                                action_type = "in_progress" 
+                            elif "'action': 'completed'" in action_str or '"action": "completed"' in action_str or "completed" in action_str:
+                                action_type = "completed"
                         
                         action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({status}"
                         
