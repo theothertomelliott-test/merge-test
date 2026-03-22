@@ -11,6 +11,9 @@ app = modal.App("merge-queue-webhook-receiver")
 # Modal Dict to store build counts per branch
 build_counts = modal.Dict.from_name("branch-build-counts", create_if_missing=True)
 
+# Modal Dict to store pull request actions by PR ID
+pr_actions = modal.Dict.from_name("pr-actions", create_if_missing=True)
+
 # Modal Secret for GitHub webhook validation
 webhook_secret = modal.Secret.from_name("github-app")
 
@@ -55,19 +58,52 @@ async def github_webhook(request: Request):
         
         print("✅ GitHub webhook signature verified")
         print("📡 GitHub webhook received:")
-        type = "Unknown"
+        event_type = "Unknown"
         if payload.get("pull_request"):
-            type = "pull_request"
-        if payload.get("workflow_run"):
+            event_type = "pull_request"
+            pr_data = payload["pull_request"]
+            pr_id = str(pr_data["number"])
+            action = payload.get("action", "unknown")
+            
+            # Store PR action
+            import datetime
+            timestamp = datetime.datetime.now().isoformat()
+            
+            # Get existing actions for this PR
+            existing_actions = pr_actions.get(pr_id, "[]")
+            import json as json_lib
+            actions_list = json_lib.loads(existing_actions)
+            
+            # Add new action
+            new_action = {
+                "action": action,
+                "timestamp": timestamp,
+                "title": pr_data.get("title", ""),
+                "state": pr_data.get("state", ""),
+                "user": pr_data.get("user", {}).get("login", ""),
+                "base_branch": pr_data.get("base", {}).get("ref", ""),
+                "head_branch": pr_data.get("head", {}).get("ref", "")
+            }
+            actions_list.append(new_action)
+            
+            # Store updated actions (keep only last 10 actions per PR)
+            if len(actions_list) > 10:
+                actions_list = actions_list[-10:]
+            
+            pr_actions[pr_id] = json_lib.dumps(actions_list)
+            
+            print(f"🔍 PR #{pr_id} action: {action}")
+            
+        elif payload.get("workflow_run"):
             # Ignore workflow run events
-            type = "workflow_run"
+            event_type = "workflow_run"
             return {"status": "success", "message": "Workflow run received"}
-        if payload.get("workflow_job"):
+        elif payload.get("workflow_job"):
             # Ignore workflow job events
-            type = "workflow_job"
+            event_type = "workflow_job"
             return {"status": "success", "message": "Workflow job received"}
 
-        print("Action:", payload.get("action"), "Type:", type)
+        print("Action:", payload.get("action"), "Type:", event_type)
         print(json.dumps(payload, indent=2))
         
         return {"status": "success", "message": "GitHub webhook received and verified"}
@@ -132,18 +168,41 @@ def webhook_endpoint(request_data: Dict[str, Any]):
 @app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
 @modal.fastapi_endpoint(method="GET", docs=False)
 def get_build_counts():
-    """Get all build counts"""
+    """Get all build counts and PR actions"""
     from fastapi import Response
     
-    counts_dict = dict(build_counts.items())
+    # Get build counts
+    build_counts_dict = dict(build_counts.items())
+    sorted_builds = sorted(build_counts_dict.items())
     
-    # Sort by branch name and create line-by-line output
-    sorted_branches = sorted(counts_dict.items())
+    # Get PR actions
+    pr_actions_dict = dict(pr_actions.items())
+    sorted_prs = sorted(pr_actions_dict.items(), key=lambda x: int(x[0]) if x[0].isdigit() else x[0])
     
     lines = []
     
-    for branch, count in sorted_branches:
+    # Build counts section
+    lines.append("=== BUILD COUNTS ===")
+    for branch, count in sorted_builds:
         lines.append(f"{branch}: {count}")
+    
+    lines.append("")
+    
+    # PR actions section
+    lines.append("=== PULL REQUEST ACTIONS ===")
+    for pr_id, actions_json in sorted_prs:
+        import json as json_lib
+        try:
+            actions = json_lib.loads(actions_json)
+            lines.append(f"PR #{pr_id}:")
+            for action in actions:
+                lines.append(f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})")
+                lines.append(f"    Title: {action['title']}")
+                lines.append(f"    Branches: {action['head_branch']} -> {action['base_branch']}")
+            lines.append("")
+        except:
+            lines.append(f"PR #{pr_id}: [Invalid data]")
+            lines.append("")
     
     content = "\n".join(lines)
     return Response(content=content, media_type="text/plain")
@@ -152,9 +211,10 @@ def get_build_counts():
 @app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
 @modal.fastapi_endpoint(method="DELETE")
 def clear_build_counts():
-    """Clear all build counts"""
+    """Clear all build counts and PR actions"""
     build_counts.clear()
+    pr_actions.clear()
     return {
         "status": "success",
-        "message": "All build counts cleared"
+        "message": "All build counts and PR actions cleared"
     }
