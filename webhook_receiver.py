@@ -125,61 +125,29 @@ async def github_webhook(request: Request):
             pr_id = str(pr_data["number"])
             action = payload.get("action", "unknown")
             
-            # Debug: Log all PR webhook events
-            print(f"🔍 PR Webhook Event - PR #{pr_id}, Action: {action}, Timestamp: {datetime.datetime.now().isoformat()}")
+            # CRITICAL DEBUG: Log ALL PR webhook events immediately
+            print(f"🚨 PR WEBHOOK RECEIVED - PR #{pr_id}, Action: {action}")
             
             # Store PR action
             import datetime
             timestamp = datetime.datetime.now().isoformat()
+            
+            # Debug: Log all PR webhook events
+            print(f"🔍 PR Webhook Event - PR #{pr_id}, Action: {action}, Timestamp: {timestamp}")
             
             # Get existing actions for this PR
             existing_actions = pr_actions.get(pr_id, "[]")
             import json as json_lib
             actions_list = json_lib.loads(existing_actions)
             
-            # Ensure we have PR data - extract from existing actions if missing
-            pr_data_json = pr_data_store.get(pr_id, "{}")
-            pr_data = json_lib.loads(pr_data_json)
+            # Simplified: Just use the PR data from webhook payload directly
+            print(f"🔍 Processing PR #{pr_id} action: {action}")
             
-            if not pr_data.get("title"):  # If we don't have PR data, extract from existing actions
-                print(f"🔍 Missing PR data for #{pr_id}, extracting from existing actions...")
-                if actions_list:
-                    # Find the first action that has a title and extract PR info
-                    for action in actions_list:
-                        if action.get("title") and action.get("title") != "Unknown Title":
-                            # Extract PR title from workflow action or use action title directly
-                            if "PR #" in action.get("title", ""):
-                                pr_title = action.get("title")
-                            else:
-                                # For workflow actions, we need to be smarter
-                                pr_title = f"PR #{pr_id}"
-                            
-                            pr_data = {
-                                "title": pr_title,
-                                "state": action.get("state", "unknown"),
-                                "user": action.get("user", {"login": "unknown"}) if isinstance(action.get("user"), dict) else {"login": action.get("user", "unknown")},
-                                "head": {"ref": action.get("head_branch", "")},
-                                "base": {"ref": action.get("base_branch", "")}
-                            }
-                            pr_data_store[pr_id] = json_lib.dumps(pr_data)
-                            print(f"🔍 Extracted PR data for #{pr_id}: {pr_title}")
-                            break
-                    else:
-                        # No existing action has title, use fallback
-                        pr_data = {"title": f"PR #{pr_id}", "state": "unknown", "user": {"login": "unknown"}}
-                        pr_data_store[pr_id] = json_lib.dumps(pr_data)
-                        print(f"🔍 Using fallback PR data for #{pr_id}")
-                else:
-                    # No existing actions, use fallback
-                    pr_data = {"title": f"PR #{pr_id}", "state": "unknown", "user": {"login": "unknown"}}
-                    pr_data_store[pr_id] = json_lib.dumps(pr_data)
-                    print(f"🔍 Using fallback PR data for #{pr_id} (no existing actions)")
-            
-            # Add new action
+            # Add new action with simple data extraction
             new_action = {
                 "action": action,
                 "timestamp": timestamp,
-                "title": pr_data.get("title", ""),
+                "title": pr_data.get("title", f"PR #{pr_id}"),
                 "state": pr_data.get("state", ""),
                 "user": pr_data.get("user", {}).get("login", ""),
                 "base_branch": pr_data.get("base", {}).get("ref", ""),
@@ -187,12 +155,12 @@ async def github_webhook(request: Request):
             }
             actions_list.append(new_action)
             
-            # Store updated actions (keep all events for testing)
+            # Store updated actions
             pr_actions[pr_id] = json_lib.dumps(actions_list)
             
             print(f"🔍 PR #{pr_id} action stored: {action} (Total actions: {len(actions_list)})")
             
-            # Store PR data for metrics calculation (update on each webhook event)
+            # Store PR data for metrics calculation
             pr_data_store[pr_id] = json_lib.dumps(pr_data)
             
             print(f"🔍 PR #{pr_id} action: {action}")
