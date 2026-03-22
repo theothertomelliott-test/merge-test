@@ -200,12 +200,12 @@ async def github_webhook(request: Request):
                 actions_list = json_lib.loads(existing_actions)
                 
                 # Add new workflow action
-                # Count existing workflow actions for this workflow to create a unique run ID
-                workflow_run_count = sum(1 for a in actions_list if a.get('workflow_name') == workflow_data.get('name', ''))
+                # Use workflow run ID from payload if available, otherwise create timestamp-based ID
+                workflow_run_id = workflow_data.get("id", f"run_{timestamp.replace(':', '-')}")
                 new_action = {
-                    "action": f"workflow_{action}_run_{workflow_run_count + 1}",
+                    "action": f"workflow_{action}_{workflow_run_id}",
                     "timestamp": timestamp,
-                    "title": f"Workflow: {workflow_data.get('name', 'unknown')} (Run #{workflow_run_count + 1})",
+                    "title": f"Workflow: {workflow_data.get('name', 'unknown')} (ID: {workflow_run_id})",
                     "state": workflow_data.get("status", "unknown"),
                     "user": "system",
                     "base_branch": "",
@@ -213,7 +213,7 @@ async def github_webhook(request: Request):
                     "workflow_name": workflow_data.get("name", ""),
                     "workflow_status": workflow_data.get("status", ""),
                     "workflow_conclusion": workflow_data.get("conclusion", ""),
-                    "run_number": workflow_run_count + 1
+                    "run_id": workflow_run_id
                 }
                 actions_list.append(new_action)
                 
@@ -252,12 +252,12 @@ async def github_webhook(request: Request):
                 actions_list = json_lib.loads(existing_actions)
                 
                 # Add new workflow job action
-                # Count existing job actions for this job to create a unique run ID
-                job_run_count = sum(1 for a in actions_list if a.get('job_name') == job_data.get('name', ''))
+                # Use job run ID from payload if available, otherwise create timestamp-based ID
+                job_run_id = job_data.get("id", f"run_{timestamp.replace(':', '-')}")
                 new_action = {
-                    "action": f"job_{action}_run_{job_run_count + 1}",
+                    "action": f"job_{action}_{job_run_id}",
                     "timestamp": timestamp,
-                    "title": f"Job: {job_data.get('name', 'unknown')} (Run #{job_run_count + 1})",
+                    "title": f"Job: {job_data.get('name', 'unknown')} (ID: {job_run_id})",
                     "state": job_data.get("status", "unknown"),
                     "user": "system",
                     "base_branch": "",
@@ -265,7 +265,7 @@ async def github_webhook(request: Request):
                     "job_name": job_data.get("name", ""),
                     "job_status": job_data.get("status", ""),
                     "job_conclusion": job_data.get("conclusion", ""),
-                    "run_number": job_run_count + 1
+                    "run_id": job_run_id
                 }
                 actions_list.append(new_action)
                 
