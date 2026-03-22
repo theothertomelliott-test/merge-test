@@ -146,10 +146,7 @@ async def github_webhook(request: Request):
             }
             actions_list.append(new_action)
             
-            # Store updated actions (keep only last 20 actions per PR to handle workflow retries)
-            if len(actions_list) > 20:
-                actions_list = actions_list[-20:]
-            
+            # Store updated actions (keep all events for testing)
             pr_actions[pr_id] = json_lib.dumps(actions_list)
             
             # Store PR data for metrics calculation (update on each webhook event)
@@ -254,10 +251,7 @@ async def github_webhook(request: Request):
                 }
                 actions_list.append(new_action)
                 
-                # Store updated actions (keep only last 15 actions per PR for workflow events)
-                if len(actions_list) > 15:
-                    actions_list = actions_list[-15:]
-                
+                # Store updated actions (keep all events for testing)
                 pr_actions[pr_id] = json_lib.dumps(actions_list)
                 
                 print(f"🔍 Workflow #{pr_id}: {workflow_data.get('name')} - {action} ({workflow_data.get('status', 'unknown')})")
@@ -306,10 +300,7 @@ async def github_webhook(request: Request):
                 }
                 actions_list.append(new_action)
                 
-                # Store updated actions (keep only last 15 actions per PR)
-                if len(actions_list) > 15:
-                    actions_list = actions_list[-15:]
-                
+                # Store updated actions (keep all events for testing)
                 pr_actions[pr_id] = json_lib.dumps(actions_list)
                 
                 print(f"🔍 Job #{pr_id}: {job_data.get('name')} - {action} ({job_data.get('status', 'unknown')})")
