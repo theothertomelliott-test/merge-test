@@ -14,6 +14,9 @@ build_counts = modal.Dict.from_name("branch-build-counts", create_if_missing=Tru
 # Modal Dict to store pull request actions by PR ID
 pr_actions = modal.Dict.from_name("pr-actions", create_if_missing=True)
 
+# Modal Dict to store PR data for metrics calculation
+pr_data_store = modal.Dict.from_name("pr-data", create_if_missing=True)
+
 def calculate_queue_metrics(actions_list, pr_data=None):
     """Calculate queue duration and classify result for dequeued PRs.
     
@@ -161,6 +164,9 @@ async def github_webhook(request: Request):
             
             pr_actions[pr_id] = json_lib.dumps(actions_list)
             
+            # Store PR data for metrics calculation (update on each webhook event)
+            pr_data_store[pr_id] = json_lib.dumps(pr_data)
+            
             print(f"🔍 PR #{pr_id} action: {action}")
             
             # Print full JSON payload only for dequeue events
@@ -278,8 +284,12 @@ def get_build_counts():
             actions = json_lib.loads(actions_json)
             lines.append(f"PR #{pr_id}:")
             
-            # Calculate queue metrics for this PR (pass PR data if available in webhook)
-            queue_metrics = calculate_queue_metrics(actions)
+            # Get PR data for metrics calculation
+            pr_data_json = pr_data_store.get(pr_id, "{}")
+            pr_data = json_lib.loads(pr_data_json)
+            
+            # Calculate queue metrics for this PR with stored PR data
+            queue_metrics = calculate_queue_metrics(actions, pr_data)
             
             for action in actions:
                 action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})"
@@ -309,6 +319,7 @@ def clear_build_counts():
     """Clear all build counts and PR actions"""
     build_counts.clear()
     pr_actions.clear()
+    pr_data_store.clear()
     return {
         "status": "success",
         "message": "All build counts and PR actions cleared"
