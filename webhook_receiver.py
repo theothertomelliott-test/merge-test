@@ -63,6 +63,14 @@ def calculate_queue_metrics(actions_list, pr_data=None):
             merged_time_str = pr_data["merged_at"].replace("Z", "+00:00")
             merged_time = datetime.fromisoformat(merged_time_str)
             pr_duration_seconds = (dequeue_time - merged_time).total_seconds()
+            print(f"🔍 PR Duration Debug:")
+            print(f"  Merged at: {pr_data['merged_at']}")
+            print(f"  Dequeue time: {dequeue_time}")
+            print(f"  PR duration: {pr_duration_seconds}s")
+        else:
+            print(f"🔍 PR Duration Debug: No merged_at in PR data")
+            print(f"  PR data keys: {list(pr_data.keys()) if pr_data else 'None'}")
+            print(f"  Has merged_at: {pr_data.get('merged_at') if pr_data else 'N/A'}")
         
         # Classify result based on PR state at dequeue
         state_at_dequeue = dequeue_action.get("state", "unknown")
