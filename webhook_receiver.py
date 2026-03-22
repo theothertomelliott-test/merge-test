@@ -184,10 +184,62 @@ async def github_webhook(request: Request):
             
             # Extract PR information from workflow
             pr_id = None
+            
+            # Method 1: Direct pull_requests association
             if workflow_data.get("pull_requests"):
                 pr_list = workflow_data["pull_requests"]
                 if pr_list and len(pr_list) > 0:
                     pr_id = str(pr_list[0]["number"])
+            
+            # Method 2: Try to match by head branch if no direct PR association
+            if not pr_id and workflow_data.get("head_branch"):
+                head_branch = workflow_data["head_branch"]
+                # Look for PRs that have this head branch in our stored data
+                for stored_pr_id, actions_json in pr_actions.items():
+                    try:
+                        import json as json_lib
+                        actions = json_lib.loads(actions_json)
+                        for action in actions:
+                            if action.get("head_branch") == head_branch:
+                                pr_id = stored_pr_id
+                                print(f"🔍 Workflow Debug - Matched PR {pr_id} by head_branch {head_branch}")
+                                break
+                        if pr_id:
+                            break
+                    except:
+                        continue
+            
+            # Method 3: Try to match by workflow name patterns
+            if not pr_id:
+                workflow_name = workflow_data.get("name", "")
+                if "merge" in workflow_name.lower():
+                    print(f"🔍 Workflow Debug - Found merge-related workflow {workflow_name} but no PR match")
+                    
+                    # Look for recently enqueued PRs that might be processing
+                    for stored_pr_id, actions_json in pr_actions.items():
+                        try:
+                            import json as json_lib
+                            actions = json_lib.loads(actions_json)
+                            # Check if this PR was recently enqueued
+                            for action in reversed(actions[-5:]):  # Check last 5 actions
+                                if action.get("action") == "enqueued":
+                                    import datetime
+                                    try:
+                                        action_time = datetime.datetime.fromisoformat(action["timestamp"])
+                                        current_time = datetime.datetime.now()
+                                        # If enqueued within last 5 minutes, this might be the PR
+                                        if (current_time - action_time).total_seconds() < 300:
+                                            pr_id = stored_pr_id
+                                            print(f"🔍 Workflow Debug - Matched PR {pr_id} as recently enqueued")
+                                            break
+                                    except:
+                                        continue
+                            if pr_id:
+                                break
+                        except:
+                            continue
+            
+            print(f"🔍 Workflow Debug - Final PR ID: {pr_id} for workflow {workflow_data.get('name')}")
             
             if pr_id:
                 # Store workflow action
@@ -388,18 +440,48 @@ def get_build_counts():
                         workflow_name = action.get('workflow_name', 'unknown')
                         status = action.get('workflow_status', 'unknown')
                         conclusion = action.get('workflow_conclusion', '')
-                        action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({status}"
+                        
+                        # Extract action type (requested, in_progress, completed) from the malformed action string
+                        action_type = "unknown"
+                        action_str = action['action'].lower()
+                        
+                        # The action string might contain the full dictionary, so look for patterns
+                        if "'action': 'requested'" in action_str or '"action": "requested"' in action_str:
+                            action_type = "requested"
+                        elif "'action': 'in_progress'" in action_str or '"action": "in_progress"' in action_str:
+                            action_type = "in_progress" 
+                        elif "'action': 'completed'" in action_str or '"action": "completed"' in action_str:
+                            action_type = "completed"
+                        elif "requested" in action_str and "queued" in action_str:
+                            action_type = "requested"  # queued maps to requested
+                        elif "in_progress" in action_str or "progress" in action_str:
+                            action_type = "in_progress"  # partial match
+                        elif ("completed" in action_str or "success" in action_str or "failure" in action_str) and "workflow" in action_str:
+                            action_type = "completed"  # conclusion indicates completion
+                        
+                        action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({status}"
+                        
                         if conclusion:
                             action_line += f" - {conclusion}"
-                        action_line += f") [Workflow: {workflow_name}]"
+                        action_line += f") [{workflow_name}]"
                     else:  # job actions
                         job_name = action.get('job_name', 'unknown')
                         status = action.get('job_status', 'unknown')
                         conclusion = action.get('job_conclusion', '')
-                        action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({status}"
+                        
+                        # Extract action type from the malformed action string
+                        action_type = "unknown"
+                        if "requested" in action['action']:
+                            action_type = "requested"
+                        elif "in_progress" in action['action']:
+                            action_type = "in_progress"
+                        elif "completed" in action['action']:
+                            action_type = "completed"
+                        
+                        action_line = f"  {action['timestamp']} - job_{action_type} by {action['user']} ({status}"
                         if conclusion:
                             action_line += f" - {conclusion}"
-                        action_line += f") [Job: {job_name}]"
+                        action_line += f") [{job_name}]"
                 else:
                     # PR actions
                     action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})"
