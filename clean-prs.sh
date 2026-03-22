@@ -45,3 +45,17 @@ done
 echo ""
 echo "🎉 Cleanup completed!"
 echo "📈 All open PRs have been closed."
+
+# Clear webhook receiver state
+echo ""
+echo "🧹 Clearing webhook receiver state..."
+WEBHOOK_CLEAR_URL="https://theothertomelliott--merge-queue-webhook-receiver-clear-b-91cdf4.modal.run"
+
+if curl -X DELETE "$WEBHOOK_CLEAR_URL" >/dev/null 2>&1; then
+  echo "✅ Webhook receiver state cleared"
+else
+  echo "⚠️  Failed to clear webhook receiver state (may be unavailable)"
+fi
+
+echo ""
+echo "🎯 Full cleanup complete!"
