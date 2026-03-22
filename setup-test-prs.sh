@@ -4,10 +4,10 @@
 
 set -e
 
-echo "🚀 Setting up 5 test PRs in order: ok, merge_fail, ok, ok, ok"
+echo "🚀 Setting up 5 test PRs in order: ok, merge_fail, merge_fail, ok, ok"
 
 # Array of check values in the specified order
-declare -a CHECK_VALUES=("ok" "merge_fail" "ok" "ok" "ok")
+declare -a CHECK_VALUES=("ok" "merge_fail" "merge_fail" "ok" "ok")
 declare -a PR_URLS=()
 
 # Create each PR
