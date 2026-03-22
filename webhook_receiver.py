@@ -200,17 +200,20 @@ async def github_webhook(request: Request):
                 actions_list = json_lib.loads(existing_actions)
                 
                 # Add new workflow action
+                # Count existing workflow actions for this workflow to create a unique run ID
+                workflow_run_count = sum(1 for a in actions_list if a.get('workflow_name') == workflow_data.get('name', ''))
                 new_action = {
-                    "action": f"workflow_{action}",
+                    "action": f"workflow_{action}_run_{workflow_run_count + 1}",
                     "timestamp": timestamp,
-                    "title": f"Workflow: {workflow_data.get('name', 'unknown')}",
+                    "title": f"Workflow: {workflow_data.get('name', 'unknown')} (Run #{workflow_run_count + 1})",
                     "state": workflow_data.get("status", "unknown"),
                     "user": "system",
                     "base_branch": "",
                     "head_branch": "",
                     "workflow_name": workflow_data.get("name", ""),
                     "workflow_status": workflow_data.get("status", ""),
-                    "workflow_conclusion": workflow_data.get("conclusion", "")
+                    "workflow_conclusion": workflow_data.get("conclusion", ""),
+                    "run_number": workflow_run_count + 1
                 }
                 actions_list.append(new_action)
                 
@@ -249,17 +252,20 @@ async def github_webhook(request: Request):
                 actions_list = json_lib.loads(existing_actions)
                 
                 # Add new workflow job action
+                # Count existing job actions for this job to create a unique run ID
+                job_run_count = sum(1 for a in actions_list if a.get('job_name') == job_data.get('name', ''))
                 new_action = {
-                    "action": f"job_{action}",
+                    "action": f"job_{action}_run_{job_run_count + 1}",
                     "timestamp": timestamp,
-                    "title": f"Job: {job_data.get('name', 'unknown')}",
+                    "title": f"Job: {job_data.get('name', 'unknown')} (Run #{job_run_count + 1})",
                     "state": job_data.get("status", "unknown"),
                     "user": "system",
                     "base_branch": "",
                     "head_branch": "",
                     "job_name": job_data.get("name", ""),
                     "job_status": job_data.get("status", ""),
-                    "job_conclusion": job_data.get("conclusion", "")
+                    "job_conclusion": job_data.get("conclusion", ""),
+                    "run_number": job_run_count + 1
                 }
                 actions_list.append(new_action)
                 
