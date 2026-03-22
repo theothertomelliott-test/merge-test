@@ -11,6 +11,18 @@ OPEN_PRS=$(gh pr list --state open --json number | jq -r '.[].number' 2>/dev/nul
 
 if [[ -z "$OPEN_PRS" ]]; then
   echo "ℹ️  No open pull requests found."
+  echo ""
+  echo "🧹 Clearing webhook receiver state..."
+  WEBHOOK_CLEAR_URL="https://theothertomelliott--merge-queue-webhook-receiver-clear-b-91cdf4.modal.run"
+
+  if curl -X DELETE "$WEBHOOK_CLEAR_URL" >/dev/null 2>&1; then
+    echo "✅ Webhook receiver state cleared"
+  else
+    echo "⚠️  Failed to clear webhook receiver state (may be unavailable)"
+  fi
+
+  echo ""
+  echo "🎯 Cleanup complete!"
   exit 0
 fi
 
