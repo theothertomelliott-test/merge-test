@@ -56,14 +56,16 @@ async def github_webhook(request: Request):
         print("✅ GitHub webhook signature verified")
         print("📡 GitHub webhook received:")
         type = "Unknown"
-        if payload.get("action"):
-            type = payload.get("action")
         if payload.get("pull_request"):
             type = "pull_request"
         if payload.get("workflow_run"):
+            # Ignore workflow run events
             type = "workflow_run"
+            return {"status": "success", "message": "Workflow run received"}
         if payload.get("workflow_job"):
+            # Ignore workflow job events
             type = "workflow_job"
+            return {"status": "success", "message": "Workflow job received"}
 
         print("Action:", payload.get("action"), "Type:", type)
         print(json.dumps(payload, indent=2))
