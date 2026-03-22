@@ -194,50 +194,40 @@ async def github_webhook(request: Request):
             # Method 2: Try to match by head branch if no direct PR association
             if not pr_id and workflow_data.get("head_branch"):
                 head_branch = workflow_data["head_branch"]
-                # Look for PRs that have this head branch in our stored data
-                for stored_pr_id, actions_json in pr_actions.items():
-                    try:
-                        import json as json_lib
-                        actions = json_lib.loads(actions_json)
-                        for action in actions:
-                            if action.get("head_branch") == head_branch:
-                                pr_id = stored_pr_id
-                                print(f"🔍 Workflow Debug - Matched PR {pr_id} by head_branch {head_branch}")
-                                break
-                        if pr_id:
-                            break
-                    except:
-                        continue
-            
-            # Method 3: Try to match by workflow name patterns
-            if not pr_id:
-                workflow_name = workflow_data.get("name", "")
-                if "merge" in workflow_name.lower():
-                    print(f"🔍 Workflow Debug - Found merge-related workflow {workflow_name} but no PR match")
-                    
-                    # Look for recently enqueued PRs that might be processing
+                print(f"🔍 Workflow Debug - Trying head_branch match: {head_branch}")
+                
+                # Check if it's a merge queue temporary branch
+                if "gh-readonly-queue/main/pr-" in head_branch:
+                    # Extract PR number from: refs/heads/gh-readonly-queue/main/pr-171-<hash>
+                    import re
+                    pr_match = re.search(r'gh-readonly-queue/main/pr-(\d+)-', head_branch)
+                    if pr_match:
+                        pr_id = pr_match.group(1)
+                        print(f"🔍 Workflow Debug - Extracted PR {pr_id} from merge queue branch")
+                else:
+                    # Regular branch matching
+                    # Look for PRs that have this head branch in our stored data
                     for stored_pr_id, actions_json in pr_actions.items():
                         try:
                             import json as json_lib
                             actions = json_lib.loads(actions_json)
-                            # Check if this PR was recently enqueued
-                            for action in reversed(actions[-5:]):  # Check last 5 actions
-                                if action.get("action") == "enqueued":
-                                    import datetime
-                                    try:
-                                        action_time = datetime.datetime.fromisoformat(action["timestamp"])
-                                        current_time = datetime.datetime.now()
-                                        # If enqueued within last 5 minutes, this might be the PR
-                                        if (current_time - action_time).total_seconds() < 300:
-                                            pr_id = stored_pr_id
-                                            print(f"🔍 Workflow Debug - Matched PR {pr_id} as recently enqueued")
-                                            break
-                                    except:
-                                        continue
+                            for action in actions:
+                                if action.get("head_branch") == head_branch:
+                                    pr_id = stored_pr_id
+                                    print(f"🔍 Workflow Debug - Matched PR {pr_id} by head_branch {head_branch}")
+                                    break
                             if pr_id:
                                 break
                         except:
                             continue
+            
+            # Method 3: Only use timing-based matching as last resort (disabled to prevent cross-contamination)
+            if not pr_id:
+                workflow_name = workflow_data.get("name", "")
+                if "merge" in workflow_name.lower():
+                    print(f"🔍 Workflow Debug - Found merge-related workflow {workflow_name} but no PR match")
+                    print(f"🔍 Workflow Debug - Skipping timing-based match to prevent cross-contamination")
+                    # Skip timing-based matching to avoid associating workflows with wrong PRs
             
             print(f"🔍 Workflow Debug - Final PR ID: {pr_id} for workflow {workflow_data.get('name')}")
             
