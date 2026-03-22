@@ -440,18 +440,48 @@ def get_build_counts():
                         workflow_name = action.get('workflow_name', 'unknown')
                         status = action.get('workflow_status', 'unknown')
                         conclusion = action.get('workflow_conclusion', '')
-                        action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({status}"
+                        
+                        # Extract action type (requested, in_progress, completed) from the malformed action string
+                        action_type = "unknown"
+                        action_str = action['action'].lower()
+                        
+                        # The action string might contain the full dictionary, so look for patterns
+                        if "'action': 'requested'" in action_str or '"action": "requested"' in action_str:
+                            action_type = "requested"
+                        elif "'action': 'in_progress'" in action_str or '"action": "in_progress"' in action_str:
+                            action_type = "in_progress" 
+                        elif "'action': 'completed'" in action_str or '"action": "completed"' in action_str:
+                            action_type = "completed"
+                        elif "requested" in action_str and "queued" in action_str:
+                            action_type = "requested"  # queued maps to requested
+                        elif "in_progress" in action_str or "progress" in action_str:
+                            action_type = "in_progress"  # partial match
+                        elif ("completed" in action_str or "success" in action_str or "failure" in action_str) and "workflow" in action_str:
+                            action_type = "completed"  # conclusion indicates completion
+                        
+                        action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({status}"
+                        
                         if conclusion:
                             action_line += f" - {conclusion}"
-                        action_line += f") [Workflow: {workflow_name}]"
+                        action_line += f") [{workflow_name}]"
                     else:  # job actions
                         job_name = action.get('job_name', 'unknown')
                         status = action.get('job_status', 'unknown')
                         conclusion = action.get('job_conclusion', '')
-                        action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({status}"
+                        
+                        # Extract action type from the malformed action string
+                        action_type = "unknown"
+                        if "requested" in action['action']:
+                            action_type = "requested"
+                        elif "in_progress" in action['action']:
+                            action_type = "in_progress"
+                        elif "completed" in action['action']:
+                            action_type = "completed"
+                        
+                        action_line = f"  {action['timestamp']} - job_{action_type} by {action['user']} ({status}"
                         if conclusion:
                             action_line += f" - {conclusion}"
-                        action_line += f") [Job: {job_name}]"
+                        action_line += f") [{job_name}]"
                 else:
                     # PR actions
                     action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})"
