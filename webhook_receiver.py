@@ -221,14 +221,6 @@ async def github_webhook(request: Request):
                         except:
                             continue
             
-            # Method 3: Only use timing-based matching as last resort (disabled to prevent cross-contamination)
-            if not pr_id:
-                workflow_name = workflow_data.get("name", "")
-                if "merge" in workflow_name.lower():
-                    print(f"🔍 Workflow Debug - Found merge-related workflow {workflow_name} but no PR match")
-                    print(f"🔍 Workflow Debug - Skipping timing-based match to prevent cross-contamination")
-                    # Skip timing-based matching to avoid associating workflows with wrong PRs
-            
             print(f"🔍 Workflow Debug - Final PR ID: {pr_id} for workflow {workflow_data.get('name')}")
             
             if pr_id:
