@@ -277,37 +277,19 @@ async def github_webhook(request: Request):
                 
                 if not pr_data.get("title"):  # If we don't have PR data, extract from existing actions
                     print(f"🔍 Missing PR data for #{pr_id} in workflow, extracting from existing actions...")
-                    if actions_list:
-                        # Find the first action that has a title and extract PR info
-                        for action in actions_list:
-                            if action.get("title") and action.get("title") != "Unknown Title":
-                                # Extract PR title from workflow action or use action title directly
-                                if "PR #" in action.get("title", ""):
-                                    pr_title = action.get("title")
-                                else:
-                                    # For workflow actions, we need to be smarter
-                                    pr_title = f"PR #{pr_id}"
-                                
-                                pr_data = {
-                                    "title": pr_title,
-                                    "state": action.get("state", "unknown"),
-                                    "user": action.get("user", {"login": "unknown"}) if isinstance(action.get("user"), dict) else {"login": action.get("user", "unknown")},
-                                    "head": {"ref": action.get("head_branch", "")},
-                                    "base": {"ref": action.get("base_branch", "")}
-                                }
-                                pr_data_store[pr_id] = json_lib.dumps(pr_data)
-                                print(f"🔍 Extracted PR data for #{pr_id}: {pr_title}")
-                                break
-                        else:
-                            # No existing action has title, use fallback
-                            pr_data = {"title": f"PR #{pr_id}", "state": "unknown", "user": {"login": "unknown"}}
-                            pr_data_store[pr_id] = json_lib.dumps(pr_data)
-                            print(f"🔍 Using fallback PR data for #{pr_id}")
-                    else:
-                        # No existing actions, use fallback
-                        pr_data = {"title": f"PR #{pr_id}", "state": "unknown", "user": {"login": "unknown"}}
-                        pr_data_store[pr_id] = json_lib.dumps(pr_data)
-                        print(f"🔍 Using fallback PR data for #{pr_id} (no existing actions)")
+                    # For workflow events, create a better title using workflow info
+                    workflow_name = workflow_data.get("name", "unknown")
+                    pr_title = f"PR #{pr_id} - {workflow_name}"
+                    
+                    pr_data = {
+                        "title": pr_title,
+                        "state": "unknown",
+                        "user": {"login": "system"},
+                        "head": {"ref": workflow_data.get("head_branch", "")},
+                        "base": {"ref": "main"}
+                    }
+                    pr_data_store[pr_id] = json_lib.dumps(pr_data)
+                    print(f"🔍 Created PR data for #{pr_id}: {pr_title}")
                 
                 # Add new workflow action
                 # Use workflow run ID from payload if available, otherwise create timestamp-based ID
