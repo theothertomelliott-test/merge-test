@@ -177,12 +177,102 @@ async def github_webhook(request: Request):
                         print(f"  {key}: {pr_data[key]}")
             
         elif payload.get("workflow_run"):
-            # Ignore workflow run events
+            # Handle workflow run events
             event_type = "workflow_run"
+            workflow_data = payload["workflow_run"]
+            action = payload.get("action", "unknown")
+            
+            # Extract PR information from workflow
+            pr_id = None
+            if workflow_data.get("pull_requests"):
+                pr_list = workflow_data["pull_requests"]
+                if pr_list and len(pr_list) > 0:
+                    pr_id = str(pr_list[0]["number"])
+            
+            if pr_id:
+                # Store workflow action
+                import datetime
+                timestamp = datetime.datetime.now().isoformat()
+                
+                # Get existing actions for this PR
+                existing_actions = pr_actions.get(pr_id, "[]")
+                import json as json_lib
+                actions_list = json_lib.loads(existing_actions)
+                
+                # Add new workflow action
+                new_action = {
+                    "action": f"workflow_{action}",
+                    "timestamp": timestamp,
+                    "title": f"Workflow: {workflow_data.get('name', 'unknown')}",
+                    "state": workflow_data.get("status", "unknown"),
+                    "user": "system",
+                    "base_branch": "",
+                    "head_branch": "",
+                    "workflow_name": workflow_data.get("name", ""),
+                    "workflow_status": workflow_data.get("status", ""),
+                    "workflow_conclusion": workflow_data.get("conclusion", "")
+                }
+                actions_list.append(new_action)
+                
+                # Store updated actions (keep only last 15 actions per PR for workflow events)
+                if len(actions_list) > 15:
+                    actions_list = actions_list[-15:]
+                
+                pr_actions[pr_id] = json_lib.dumps(actions_list)
+                
+                print(f"🔍 Workflow #{pr_id}: {workflow_data.get('name')} - {action} ({workflow_data.get('status', 'unknown')})")
+            else:
+                print(f"🔍 Workflow without PR: {workflow_data.get('name')} - {action}")
+            
             return {"status": "success", "message": "Workflow run received"}
         elif payload.get("workflow_job"):
-            # Ignore workflow job events
+            # Handle workflow job events
             event_type = "workflow_job"
+            job_data = payload["workflow_job"]
+            action = payload.get("action", "unknown")
+            
+            # Extract PR information from workflow job
+            pr_id = None
+            if job_data.get("pull_requests"):
+                pr_list = job_data["pull_requests"]
+                if pr_list and len(pr_list) > 0:
+                    pr_id = str(pr_list[0]["number"])
+            
+            if pr_id:
+                # Store workflow job action
+                import datetime
+                timestamp = datetime.datetime.now().isoformat()
+                
+                # Get existing actions for this PR
+                existing_actions = pr_actions.get(pr_id, "[]")
+                import json as json_lib
+                actions_list = json_lib.loads(existing_actions)
+                
+                # Add new workflow job action
+                new_action = {
+                    "action": f"job_{action}",
+                    "timestamp": timestamp,
+                    "title": f"Job: {job_data.get('name', 'unknown')}",
+                    "state": job_data.get("status", "unknown"),
+                    "user": "system",
+                    "base_branch": "",
+                    "head_branch": "",
+                    "job_name": job_data.get("name", ""),
+                    "job_status": job_data.get("status", ""),
+                    "job_conclusion": job_data.get("conclusion", "")
+                }
+                actions_list.append(new_action)
+                
+                # Store updated actions (keep only last 15 actions per PR)
+                if len(actions_list) > 15:
+                    actions_list = actions_list[-15:]
+                
+                pr_actions[pr_id] = json_lib.dumps(actions_list)
+                
+                print(f"🔍 Job #{pr_id}: {job_data.get('name')} - {action} ({job_data.get('status', 'unknown')})")
+            else:
+                print(f"🔍 Job without PR: {job_data.get('name')} - {action}")
+            
             return {"status": "success", "message": "Workflow job received"}
 
         print("Action:", payload.get("action"), "Type:", event_type)
@@ -285,16 +375,40 @@ def get_build_counts():
             queue_metrics = calculate_queue_metrics(actions, pr_data)
             
             for action in actions:
-                action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})"
-                
-                # Add queue metrics to dequeue action
-                if action['action'] == 'dequeued' and queue_metrics:
-                    metrics_text = queue_metrics['queue_duration_formatted']
-                    action_line += f" [{metrics_text}, {queue_metrics['result']}]"
+                # Handle different action types
+                if action['action'].startswith('workflow_') or action['action'].startswith('job_'):
+                    # Workflow/job actions
+                    if action['action'].startswith('workflow_'):
+                        workflow_name = action.get('workflow_name', 'unknown')
+                        status = action.get('workflow_status', 'unknown')
+                        conclusion = action.get('workflow_conclusion', '')
+                        action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({status}"
+                        if conclusion:
+                            action_line += f" - {conclusion}"
+                        action_line += f") [Workflow: {workflow_name}]"
+                    else:  # job actions
+                        job_name = action.get('job_name', 'unknown')
+                        status = action.get('job_status', 'unknown')
+                        conclusion = action.get('job_conclusion', '')
+                        action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({status}"
+                        if conclusion:
+                            action_line += f" - {conclusion}"
+                        action_line += f") [Job: {job_name}]"
+                else:
+                    # PR actions
+                    action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})"
+                    
+                    # Add queue metrics to dequeue action
+                    if action['action'] == 'dequeued' and queue_metrics:
+                        metrics_text = queue_metrics['queue_duration_formatted']
+                        action_line += f" [{metrics_text}, {queue_metrics['result']}]"
                 
                 lines.append(action_line)
                 lines.append(f"    Title: {action['title']}")
-                lines.append(f"    Branches: {action['head_branch']} -> {action['base_branch']}")
+                
+                # Only show branches for PR actions, not workflow actions
+                if not (action['action'].startswith('workflow_') or action['action'].startswith('job_')):
+                    lines.append(f"    Branches: {action['head_branch']} -> {action['base_branch']}")
             lines.append("")
         except:
             lines.append(f"PR #{pr_id}: [Invalid data]")
