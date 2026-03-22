@@ -445,6 +445,9 @@ def get_build_counts():
                         action_type = "unknown"
                         action_str = action['action'].lower()
                         
+                        # Debug: Print the actual action string for analysis
+                        print(f"🔍 Action Debug - String: {action_str[:100]}...")  # First 100 chars
+                        
                         # The action string might contain the full dictionary, so look for patterns
                         if "'action': 'requested'" in action_str or '"action": "requested"' in action_str:
                             action_type = "requested"
@@ -458,6 +461,8 @@ def get_build_counts():
                             action_type = "in_progress"  # partial match
                         elif ("completed" in action_str or "success" in action_str or "failure" in action_str) and "workflow" in action_str:
                             action_type = "completed"  # conclusion indicates completion
+                        
+                        print(f"🔍 Action Debug - Extracted: {action_type}")  # Debug output
                         
                         action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({status}"
                         
