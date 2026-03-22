@@ -146,9 +146,9 @@ async def github_webhook(request: Request):
             }
             actions_list.append(new_action)
             
-            # Store updated actions (keep only last 10 actions per PR)
-            if len(actions_list) > 10:
-                actions_list = actions_list[-10:]
+            # Store updated actions (keep only last 20 actions per PR to handle workflow retries)
+            if len(actions_list) > 20:
+                actions_list = actions_list[-20:]
             
             pr_actions[pr_id] = json_lib.dumps(actions_list)
             
