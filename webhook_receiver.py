@@ -17,6 +17,9 @@ pr_actions = modal.Dict.from_name("pr-actions", create_if_missing=True)
 # Modal Dict to store PR data for metrics calculation
 pr_data_store = modal.Dict.from_name("pr-data", create_if_missing=True)
 
+# Modal Dict to store webhook debug information
+webhook_debug = modal.Dict.from_name("webhook-debug", create_if_missing=True)
+
 def calculate_queue_metrics(actions_list, pr_data=None):
     """Calculate queue duration and classify result for dequeued PRs.
     
@@ -186,6 +189,8 @@ async def github_webhook(request: Request):
             
             # Store updated actions (keep all events for testing)
             pr_actions[pr_id] = json_lib.dumps(actions_list)
+            
+            print(f"🔍 PR #{pr_id} action stored: {action} (Total actions: {len(actions_list)})")
             
             # Store PR data for metrics calculation (update on each webhook event)
             pr_data_store[pr_id] = json_lib.dumps(pr_data)
@@ -369,7 +374,28 @@ async def github_webhook(request: Request):
 
         print("Action:", payload.get("action"), "Type:", event_type)
         
-        return {"status": "success", "message": "GitHub webhook received and verified"}
+        # Debug: Store recent webhook events for troubleshooting
+        try:
+            recent_events = webhook_debug.get("recent_events", "[]")
+            events_list = json_lib.loads(recent_events)
+            
+            debug_event = {
+                "timestamp": datetime.datetime.now().isoformat(),
+                "action": payload.get("action", "unknown"),
+                "type": event_type,
+                "payload_keys": list(payload.keys())
+            }
+            
+            events_list.append(debug_event)
+            # Keep only last 10 events for debugging
+            if len(events_list) > 10:
+                events_list = events_list[-10:]
+            
+            webhook_debug["recent_events"] = json_lib.dumps(events_list)
+        except Exception as e:
+            print(f"❌ Failed to store debug event: {e}")
+        
+        return {"status": "success", "message": f"{event_type} event received"}
         
     except HTTPException as e:
         print(f"❌ Webhook validation failed: {e.detail}")
@@ -559,7 +585,30 @@ def clear_build_counts():
     build_counts.clear()
     pr_actions.clear()
     pr_data_store.clear()
-    return {
-        "status": "success",
-        "message": "All build counts and PR actions cleared"
-    }
+    webhook_debug.clear()
+    return {"status": "success", "message": "All data cleared"}
+
+# Endpoint to view webhook debug events
+@app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
+@modal.fastapi_endpoint(method="GET", docs=False)
+def get_webhook_debug():
+    """Get recent webhook events for debugging"""
+    from fastapi import Response
+    
+    # Get recent webhook events
+    recent_events_json = webhook_debug.get("recent_events", "[]")
+    recent_events = json.loads(recent_events_json)
+    
+    lines = []
+    lines.append("=== RECENT WEBHOOK EVENTS ===")
+    
+    if not recent_events:
+        lines.append("No webhook events received yet")
+    else:
+        for event in reversed(recent_events):  # Show newest first
+            lines.append(f"{event['timestamp']} - {event['type']} ({event['action']}) - Keys: {', '.join(event['payload_keys'])}")
+    
+    lines.append("")
+    
+    content = "\n".join(lines)
+    return Response(content=content, media_type="text/plain")
