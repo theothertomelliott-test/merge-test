@@ -40,6 +40,9 @@ def calculate_queue_metrics(actions_list, pr_data=None):
         elif action.get("action") == "dequeued":
             dequeue_action = action
     
+    # Debug: Check what we found
+    print(f"🔍 Debug: Found enqueue: {bool(enqueue_action)}, dequeue: {bool(dequeue_action)}")
+    
     # Calculate metrics only if both actions exist
     if not enqueue_action or not dequeue_action:
         return None
@@ -169,19 +172,29 @@ async def github_webhook(request: Request):
             
             print(f"🔍 PR #{pr_id} action: {action}")
             
-            # Print full JSON payload only for dequeue events
-            if action == "dequeued":
-                print("📋 Dequeue event details:")
-                print(json.dumps(payload, indent=2))
-                
-                # Calculate and display queue metrics for comparison
-                queue_metrics = calculate_queue_metrics(actions_list, pr_data)
+            # Calculate queue metrics for this PR with stored PR data
+            queue_metrics = calculate_queue_metrics(actions_list, pr_data)
+            
+            # Debug logging for dequeued PRs
+            if any(action['action'] == 'dequeued' for action in actions):
+                print(f"🔍 GET Debug PR #{pr_id}:")
+                print(f"  Actions count: {len(actions)}")
+                print(f"  PR data available: {bool(pr_data)}")
+                print(f"  Merged at in PR data: {pr_data.get('merged_at') if pr_data else 'N/A'}")
+                print(f"  Queue metrics: {queue_metrics}")
+            
+            # Debug logging
+            if any(action['action'] == 'dequeued' for action in actions_list):
+                print(f"� Debug PR #{pr_id}:")
+                print(f"  Actions count: {len(actions_list)}")
+        
+                print(f"  Merged at in PR data: {pr_data.get('merged_at') if pr_data else 'N/A'}")
+                print(f"  Queue metrics: {queue_metrics}")
                 if queue_metrics:
                     print(f"📊 Queue Metrics:")
                     print(f"  Enqueue->Dequeue: {queue_metrics['queue_duration_formatted']}")
                     if queue_metrics.get('pr_duration_formatted'):
                         print(f"  Merged->Dequeue: {queue_metrics['pr_duration_formatted']}")
-                    print(f"  Result: {queue_metrics['result']}")
             
         elif payload.get("workflow_run"):
             # Ignore workflow run events
