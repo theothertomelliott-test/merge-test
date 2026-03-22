@@ -55,6 +55,7 @@ async def github_webhook(request: Request):
         
         print("✅ GitHub webhook signature verified")
         print("📡 GitHub webhook received:")
+        print("Action:", payload.get("action"))
         print(json.dumps(payload, indent=2))
         
         return {"status": "success", "message": "GitHub webhook received and verified"}
