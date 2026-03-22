@@ -14,11 +14,12 @@ build_counts = modal.Dict.from_name("branch-build-counts", create_if_missing=Tru
 # Modal Dict to store pull request actions by PR ID
 pr_actions = modal.Dict.from_name("pr-actions", create_if_missing=True)
 
-def calculate_queue_metrics(actions_list):
+def calculate_queue_metrics(actions_list, pr_data=None):
     """Calculate queue duration and classify result for dequeued PRs.
     
     Args:
         actions_list: List of PR action dictionaries
+        pr_data: PR data from webhook payload (optional)
         
     Returns:
         Dictionary with queue metrics or None if not applicable
@@ -46,8 +47,16 @@ def calculate_queue_metrics(actions_list):
         enqueue_time = datetime.fromisoformat(enqueue_action["timestamp"])
         dequeue_time = datetime.fromisoformat(dequeue_action["timestamp"])
         
-        # Calculate duration in seconds
-        duration_seconds = (dequeue_time - enqueue_time).total_seconds()
+        # Calculate duration between enqueue and dequeue
+        queue_duration_seconds = (dequeue_time - enqueue_time).total_seconds()
+        
+        # Calculate duration between merged_at and dequeue if PR data available
+        pr_duration_seconds = None
+        if pr_data and pr_data.get("merged_at"):
+            # Parse GitHub timestamp (convert Z to +00:00 for ISO format)
+            merged_time_str = pr_data["merged_at"].replace("Z", "+00:00")
+            merged_time = datetime.fromisoformat(merged_time_str)
+            pr_duration_seconds = (dequeue_time - merged_time).total_seconds()
         
         # Classify result based on PR state at dequeue
         state_at_dequeue = dequeue_action.get("state", "unknown")
@@ -58,12 +67,19 @@ def calculate_queue_metrics(actions_list):
         else:
             result = "unknown"
         
-        return {
-            "queue_duration_seconds": round(duration_seconds, 2),
-            "queue_duration_formatted": f"{duration_seconds:.1f}s",
+        metrics = {
+            "queue_duration_seconds": round(queue_duration_seconds, 2),
+            "queue_duration_formatted": f"{queue_duration_seconds:.1f}s",
             "result": result,
             "state_at_dequeue": state_at_dequeue
         }
+        
+        # Add PR duration if available
+        if pr_duration_seconds is not None:
+            metrics["pr_duration_seconds"] = round(pr_duration_seconds, 2)
+            metrics["pr_duration_formatted"] = f"{pr_duration_seconds:.1f}s"
+        
+        return metrics
         
     except Exception as e:
         print(f"Error calculating queue metrics: {e}")
@@ -151,6 +167,15 @@ async def github_webhook(request: Request):
             if action == "dequeued":
                 print("📋 Dequeue event details:")
                 print(json.dumps(payload, indent=2))
+                
+                # Calculate and display queue metrics for comparison
+                queue_metrics = calculate_queue_metrics(actions_list, pr_data)
+                if queue_metrics:
+                    print(f"📊 Queue Metrics:")
+                    print(f"  Enqueue->Dequeue: {queue_metrics['queue_duration_formatted']}")
+                    if queue_metrics.get('pr_duration_formatted'):
+                        print(f"  Merged->Dequeue: {queue_metrics['pr_duration_formatted']}")
+                    print(f"  Result: {queue_metrics['result']}")
             
         elif payload.get("workflow_run"):
             # Ignore workflow run events
@@ -253,7 +278,7 @@ def get_build_counts():
             actions = json_lib.loads(actions_json)
             lines.append(f"PR #{pr_id}:")
             
-            # Calculate queue metrics for this PR
+            # Calculate queue metrics for this PR (pass PR data if available in webhook)
             queue_metrics = calculate_queue_metrics(actions)
             
             for action in actions:
@@ -261,7 +286,10 @@ def get_build_counts():
                 
                 # Add queue metrics to dequeue action
                 if action['action'] == 'dequeued' and queue_metrics:
-                    action_line += f" [{queue_metrics['queue_duration_formatted']}, {queue_metrics['result']}]"
+                    metrics_text = queue_metrics['queue_duration_formatted']
+                    if queue_metrics.get('pr_duration_formatted'):
+                        metrics_text += f", PR: {queue_metrics['pr_duration_formatted']}"
+                    action_line += f" [{metrics_text}, {queue_metrics['result']}]"
                 
                 lines.append(action_line)
                 lines.append(f"    Title: {action['title']}")
