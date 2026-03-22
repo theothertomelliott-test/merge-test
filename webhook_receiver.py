@@ -59,16 +59,23 @@ def webhook_endpoint(request_data: Dict[str, Any]):
 
 # Endpoint to view build counts
 @app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
-@modal.fastapi_endpoint(method="GET")
+@modal.fastapi_endpoint(method="GET", docs=False)
 def get_build_counts():
     """Get all build counts"""
+    from fastapi import Response
+    
     counts_dict = dict(build_counts.items())
-    return {
-        "status": "success",
-        "build_counts": counts_dict,
-        "total_branches": len(counts_dict),
-        "total_builds": sum(counts_dict.values())
-    }
+    
+    # Sort by branch name and create line-by-line output
+    sorted_branches = sorted(counts_dict.items())
+    
+    lines = []
+    
+    for branch, count in sorted_branches:
+        lines.append(f"{branch}: {count}")
+    
+    content = "\n".join(lines)
+    return Response(content=content, media_type="text/plain")
 
 # Endpoint to clear build counts
 @app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
