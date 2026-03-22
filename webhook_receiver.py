@@ -128,12 +128,12 @@ async def github_webhook(request: Request):
             # CRITICAL DEBUG: Log ALL PR webhook events immediately
             print(f"🚨 PR WEBHOOK RECEIVED - PR #{pr_id}, Action: {action}")
             
-            # Debug: Log all PR webhook events
-            print(f"🔍 PR Webhook Event - PR #{pr_id}, Action: {action}, Timestamp: {datetime.datetime.now().isoformat()}")
-            
             # Store PR action
             import datetime
             timestamp = datetime.datetime.now().isoformat()
+            
+            # Debug: Log all PR webhook events
+            print(f"🔍 PR Webhook Event - PR #{pr_id}, Action: {action}, Timestamp: {timestamp}")
             
             # Get existing actions for this PR
             existing_actions = pr_actions.get(pr_id, "[]")
