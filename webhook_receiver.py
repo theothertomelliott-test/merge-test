@@ -14,6 +14,61 @@ build_counts = modal.Dict.from_name("branch-build-counts", create_if_missing=Tru
 # Modal Dict to store pull request actions by PR ID
 pr_actions = modal.Dict.from_name("pr-actions", create_if_missing=True)
 
+def calculate_queue_metrics(actions_list):
+    """Calculate queue duration and classify result for dequeued PRs.
+    
+    Args:
+        actions_list: List of PR action dictionaries
+        
+    Returns:
+        Dictionary with queue metrics or None if not applicable
+    """
+    if not actions_list:
+        return None
+        
+    # Find enqueue and dequeue actions
+    enqueue_action = None
+    dequeue_action = None
+    
+    for action in actions_list:
+        if action.get("action") == "enqueued":
+            enqueue_action = action
+        elif action.get("action") == "dequeued":
+            dequeue_action = action
+    
+    # Calculate metrics only if both actions exist
+    if not enqueue_action or not dequeue_action:
+        return None
+    
+    try:
+        # Parse timestamps
+        from datetime import datetime
+        enqueue_time = datetime.fromisoformat(enqueue_action["timestamp"])
+        dequeue_time = datetime.fromisoformat(dequeue_action["timestamp"])
+        
+        # Calculate duration in seconds
+        duration_seconds = (dequeue_time - enqueue_time).total_seconds()
+        
+        # Classify result based on PR state at dequeue
+        state_at_dequeue = dequeue_action.get("state", "unknown")
+        if state_at_dequeue == "closed":
+            result = "success"
+        elif state_at_dequeue == "open":
+            result = "failure"
+        else:
+            result = "unknown"
+        
+        return {
+            "queue_duration_seconds": round(duration_seconds, 2),
+            "queue_duration_formatted": f"{duration_seconds:.1f}s",
+            "result": result,
+            "state_at_dequeue": state_at_dequeue
+        }
+        
+    except Exception as e:
+        print(f"Error calculating queue metrics: {e}")
+        return None
+
 # Modal Secret for GitHub webhook validation
 webhook_secret = modal.Secret.from_name("github-app")
 
@@ -56,8 +111,6 @@ async def github_webhook(request: Request):
         # Parse JSON payload
         payload = json.loads(body.decode('utf-8'))
         
-        print("✅ GitHub webhook signature verified")
-        print("📡 GitHub webhook received:")
         event_type = "Unknown"
         if payload.get("pull_request"):
             event_type = "pull_request"
@@ -94,6 +147,11 @@ async def github_webhook(request: Request):
             
             print(f"🔍 PR #{pr_id} action: {action}")
             
+            # Print full JSON payload only for dequeue events
+            if action == "dequeued":
+                print("📋 Dequeue event details:")
+                print(json.dumps(payload, indent=2))
+            
         elif payload.get("workflow_run"):
             # Ignore workflow run events
             event_type = "workflow_run"
@@ -104,7 +162,6 @@ async def github_webhook(request: Request):
             return {"status": "success", "message": "Workflow job received"}
 
         print("Action:", payload.get("action"), "Type:", event_type)
-        print(json.dumps(payload, indent=2))
         
         return {"status": "success", "message": "GitHub webhook received and verified"}
         
@@ -195,8 +252,18 @@ def get_build_counts():
         try:
             actions = json_lib.loads(actions_json)
             lines.append(f"PR #{pr_id}:")
+            
+            # Calculate queue metrics for this PR
+            queue_metrics = calculate_queue_metrics(actions)
+            
             for action in actions:
-                lines.append(f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})")
+                action_line = f"  {action['timestamp']} - {action['action']} by {action['user']} ({action['state']})"
+                
+                # Add queue metrics to dequeue action
+                if action['action'] == 'dequeued' and queue_metrics:
+                    action_line += f" [{queue_metrics['queue_duration_formatted']}, {queue_metrics['result']}]"
+                
+                lines.append(action_line)
                 lines.append(f"    Title: {action['title']}")
                 lines.append(f"    Branches: {action['head_branch']} -> {action['base_branch']}")
             lines.append("")
