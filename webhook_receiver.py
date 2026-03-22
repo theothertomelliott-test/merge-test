@@ -190,6 +190,8 @@ async def github_webhook(request: Request):
             # Store updated actions (keep all events for testing)
             pr_actions[pr_id] = json_lib.dumps(actions_list)
             
+            print(f"🔍 PR #{pr_id} action stored: {action} (Total actions: {len(actions_list)})")
+            
             # Store PR data for metrics calculation (update on each webhook event)
             pr_data_store[pr_id] = json_lib.dumps(pr_data)
             
