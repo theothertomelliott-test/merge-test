@@ -625,7 +625,24 @@ def get_build_counts():
                                 break
                         
                         if is_merge_queue_run:
-                            display_branch = f"gh-readonly-queue/main/pr-{pr_id}"
+                            # For merge queue runs, try to get the actual branch name from the action data
+                            # The workflow webhook should have captured the actual merge queue branch name
+                            action_branch = action.get('branch', '')
+                            if action_branch and 'gh-readonly-queue' in action_branch:
+                                display_branch = action_branch.replace('refs/heads/', '')
+                            else:
+                                # Fallback to the build counts to find the merge queue branch
+                                for build_key in dict(build_counts.items()).keys():
+                                    if f'pr-{pr_id}-' in build_key and 'gh-readonly-queue' in build_key:
+                                        # Extract just the branch name, remove any _build_X suffix
+                                        branch_name = build_key.replace('refs/heads/', '')
+                                        if '_build_' in branch_name:
+                                            branch_name = branch_name.split('_build_')[0]
+                                        display_branch = branch_name
+                                        break
+                                else:
+                                    # Final fallback
+                                    display_branch = f"gh-readonly-queue/main/pr-{pr_id}"
                         
                         action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({final_status})"
                         
