@@ -412,14 +412,20 @@ async def workflow_webhook(request: Request):
             pr_number = payload.get("pr_number")
             timestamp = payload.get("timestamp", "")
             
-            print(f"🔍 Check Evaluation - Branch: {branch_name}, Status: {check_status}, Commits: {len(commits)}")
+            # Extract workflow run ID from additional_info
+            workflow_run_id = None
+            additional_info = payload.get("additional_info", {})
+            if additional_info:
+                workflow_run_id = additional_info.get("workflow_run_id")
+            
+            print(f"🔍 Check Evaluation - Branch: {branch_name}, Status: {check_status}, Commits: {len(commits)}, Run ID: {workflow_run_id}")
             
             # Update build counts with commit information
             current_count = build_counts.get(branch_name, "0")
             new_count = int(current_count) + 1
             build_counts[branch_name] = str(new_count)
             
-            # Store additional build information including commits
+            # Store additional build information including commits and workflow run ID
             build_info = {
                 "branch_name": branch_name,
                 "base_branch": base_branch,
@@ -429,6 +435,7 @@ async def workflow_webhook(request: Request):
                 "commits": commits,
                 "pr_number": pr_number,
                 "timestamp": timestamp,
+                "workflow_run_id": workflow_run_id,
                 "build_count": new_count
             }
             
@@ -631,12 +638,11 @@ def get_build_counts():
                             if action_branch and 'gh-readonly-queue' in action_branch:
                                 display_branch = action_branch.replace('refs/heads/', '')
                             else:
-                                # Fallback: find the merge queue branch with closest timestamp to this action
-                                action_timestamp = action.get('timestamp', '')
+                                # Fallback: find the merge queue branch by matching workflow run ID
+                                action_run_id = action.get('run_id', '')
                                 best_branch = f"gh-readonly-queue/main/pr-{pr_id}"
-                                min_time_diff = float('inf')
                                 
-                                # Look through all build counts to find the best match
+                                # Look through all build counts to find matching workflow run ID
                                 for build_key in dict(build_counts.items()).keys():
                                     if f'pr-{pr_id}-' in build_key and 'gh-readonly-queue' in build_key and '_build_' in build_key:
                                         # Extract clean branch name
@@ -644,18 +650,16 @@ def get_build_counts():
                                         if '_build_' in clean_branch:
                                             clean_branch = clean_branch.split('_build_')[0]
                                         
-                                        # Get the build info to compare timestamps
+                                        # Get the build info to compare workflow run IDs
                                         build_info_key = f"{clean_branch}_build_1"
                                         if build_info_key in build_counts_dict:
                                             try:
                                                 build_info = json.loads(build_counts_dict[build_info_key])
-                                                build_timestamp = build_info.get('timestamp', '')
-                                                if build_timestamp:
-                                                    # Simple timestamp comparison (just for finding closest match)
-                                                    time_diff = abs(hash(build_timestamp) - hash(action_timestamp))
-                                                    if time_diff < min_time_diff:
-                                                        min_time_diff = time_diff
-                                                        best_branch = clean_branch
+                                                build_run_id = build_info.get('workflow_run_id', '')
+                                                # If workflow run IDs match, this is the right branch
+                                                if build_run_id and build_run_id == action_run_id:
+                                                    best_branch = clean_branch
+                                                    break
                                             except:
                                                 pass
                                 
