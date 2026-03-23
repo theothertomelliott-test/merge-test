@@ -371,6 +371,7 @@ async def github_webhook(request: Request):
             
             # Store build info with a key that includes the branch and count
             build_key = f"{branch_name}_build_{new_count}"
+            import json as json_lib
             build_counts[build_key] = json_lib.dumps(build_info)
             
             print(f"📊 Updated build count for {branch_name}: {new_count} (with {len(commits)} commits)")
@@ -530,7 +531,7 @@ def get_build_counts():
         build_info_key = f"{branch}_build_{count}"
         if build_info_key in build_counts_dict:
             try:
-                build_info = json_lib.loads(build_counts_dict[build_info_key])
+                build_info = json.loads(build_counts_dict[build_info_key])
                 commits = build_info.get("commits", [])
                 pr_number = build_info.get("pr_number")
                 check_status = build_info.get("check_status", "")
