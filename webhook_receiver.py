@@ -639,7 +639,16 @@ def get_build_counts():
                                 display_branch = action_branch.replace('refs/heads/', '')
                             else:
                                 # Fallback: find the merge queue branch by matching workflow run ID
+                                # Extract run_id from action string if not directly available
                                 action_run_id = action.get('run_id', '')
+                                if not action_run_id:
+                                    # Extract from action string like "workflow_completed_123456789"
+                                    action_str = action.get('action', '')
+                                    if '_' in action_str:
+                                        parts = action_str.split('_')
+                                        if len(parts) >= 3:
+                                            action_run_id = parts[-1]
+                                
                                 best_branch = f"gh-readonly-queue/main/pr-{pr_id}"
                                 
                                 # Look through all build counts to find matching workflow run ID
