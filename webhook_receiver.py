@@ -538,10 +538,8 @@ def get_build_counts():
                 
                 if commits:
                     lines.append(f"  └─ PR #{pr_number}")
-                    for i, commit in enumerate(commits[:5], 1):  # Show max 5 commits
+                    for i, commit in enumerate(commits, 1):  # Show all commits
                         lines.append(f"     {i}. {commit}")
-                    if len(commits) > 5:
-                        lines.append(f"     ... and {len(commits) - 5} more")
                 elif pr_number:
                     lines.append(f"  └─ PR #{pr_number} - {check_status.upper()}")
             except Exception as e:
@@ -608,11 +606,12 @@ def get_build_counts():
                         
                         # Show workflow with final status
                         final_status = conclusion if conclusion in ['success', 'failure', 'cancelled', 'timed_out'] else status
+                        head_branch = pr_data.get("head", {}).get("ref", "unknown")
                         action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({final_status})"
                         
                         if conclusion:
                             action_line += f" - {conclusion}"
-                        action_line += f") [{workflow_name}]"
+                        action_line += f") [{workflow_name}] - {head_branch}"
                     else:  # job actions
                         job_name = action.get('job_name', 'unknown')
                         status = action.get('job_status', 'unknown')
