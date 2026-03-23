@@ -537,7 +537,7 @@ def get_build_counts():
                 check_status = build_info.get("check_status", "")
                 
                 if commits:
-                    lines.append(f"  └─ PR #{pr_number} - {check_status.upper()}")
+                    lines.append(f"  └─ PR #{pr_number}")
                     for i, commit in enumerate(commits[:5], 1):  # Show max 5 commits
                         lines.append(f"     {i}. {commit}")
                     if len(commits) > 5:
