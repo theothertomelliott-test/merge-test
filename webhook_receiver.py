@@ -386,6 +386,65 @@ async def github_webhook(request: Request):
         print(f"❌ Error processing webhook: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+# FastAPI endpoint for receiving workflow webhooks (no signature validation)
+@app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]))
+@modal.fastapi_endpoint(method="POST", docs=False)
+async def workflow_webhook(request: Request):
+    """Receive workflow webhooks with commit information"""
+    try:
+        # Get request body
+        body = await request.body()
+        
+        # Parse JSON payload
+        payload = json.loads(body.decode('utf-8'))
+        
+        print(f"🔍 Workflow Webhook Received: {payload.get('event_type', 'unknown')}")
+        
+        # Handle check_evaluation webhook from workflow
+        if payload.get("event_type") == "check_evaluation":
+            branch_name = payload.get("branch_name", "")
+            base_branch = payload.get("base_branch", "main")
+            check_content = payload.get("check_content", "")
+            check_status = payload.get("check_status", "")
+            context = payload.get("context", "")
+            commits = payload.get("commits", [])
+            pr_number = payload.get("pr_number")
+            timestamp = payload.get("timestamp", "")
+            
+            print(f"🔍 Check Evaluation - Branch: {branch_name}, Status: {check_status}, Commits: {len(commits)}")
+            
+            # Update build counts with commit information
+            current_count = build_counts.get(branch_name, "0")
+            new_count = int(current_count) + 1
+            build_counts[branch_name] = str(new_count)
+            
+            # Store additional build information including commits
+            build_info = {
+                "branch_name": branch_name,
+                "base_branch": base_branch,
+                "check_content": check_content,
+                "check_status": check_status,
+                "context": context,
+                "commits": commits,
+                "pr_number": pr_number,
+                "timestamp": timestamp,
+                "build_count": new_count
+            }
+            
+            # Store build info with a key that includes the branch and count
+            build_key = f"{branch_name}_build_{new_count}"
+            build_counts[build_key] = json.dumps(build_info)
+            
+            print(f"📊 Updated build count for {branch_name}: {new_count} (with {len(commits)} commits)")
+            
+            return {"status": "success", "message": f"Build count updated for {branch_name}"}
+        
+        return {"status": "success", "message": "Workflow webhook received"}
+        
+    except Exception as e:
+        print(f"❌ Error processing workflow webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 # FastAPI endpoint for receiving webhooks
 @app.function(image=modal.Image.debian_slim().pip_install(["fastapi"]), max_containers=1)
 @modal.fastapi_endpoint(method="POST")

@@ -9,7 +9,7 @@ on:
     types: [checks_requested]
 
 env:
-  WEBHOOK_URL: https://theothertomelliott--merge-queue-webhook-receiver-github-webhook.modal.run
+  WEBHOOK_URL: https://theothertomelliott--merge-queue-webhook-receiver-workflow-webhook.modal.run
 
 jobs:
   check:
