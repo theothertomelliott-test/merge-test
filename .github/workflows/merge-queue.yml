@@ -113,13 +113,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
             BRANCH_NAME="${{ github.event.merge_group.head_ref }}"
             BASE_BRANCH="main"
+            # Extract PR number from the head_ref (format: gh-readonly-queue/main/pr-XXX-hash)
+            PR_NUMBER=$(echo "$BRANCH_NAME" | sed -n 's/.*pr-\([0-9]*\)-.*/\1/p')
           else
             BRANCH_NAME="${{ github.event.pull_request.head.ref }}"
             BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
           fi
           
           # Get PR number if available
-          PR_NUMBER=""
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             PR_NUMBER="${{ github.event.pull_request.number }}"
           fi
@@ -131,7 +132,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
             # For merge groups, get commits in the merge group
             echo "🔍 Merge group detected, getting commits..."
-            COMMITS=$(git log --pretty=format:'"%s"' origin/$BASE_BRANCH..origin/$BRANCH_NAME | head -10)
+            # Use the actual commits being merged in the merge group
+            COMMITS=$(git log --pretty=format:'"%s"' $BASE_BRANCH..HEAD | head -10)
             echo "🔍 Merge group commits found: $COMMITS"
           else
             # For individual PRs, get commits in the PR
