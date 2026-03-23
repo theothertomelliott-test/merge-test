@@ -433,9 +433,16 @@ async def workflow_webhook(request: Request):
             
             # Store build info with a key that includes the branch and count
             build_key = f"{branch_name}_build_{new_count}"
-            build_counts[build_key] = json.dumps(build_info)
+            try:
+                build_counts[build_key] = json.dumps(build_info)
+                print(f"📊 Successfully stored build info key: {build_key}")
+                print(f"📊 Build info content: {json.dumps(build_info, indent=2)}")
+            except Exception as e:
+                print(f"❌ Failed to store build info: {e}")
+                print(f"❌ Build info was: {build_info}")
             
             print(f"📊 Updated build count for {branch_name}: {new_count} (with {len(commits)} commits)")
+            print(f"📊 Stored build info key: {build_key}")
             
             return {"status": "success", "message": f"Build count updated for {branch_name}"}
         
