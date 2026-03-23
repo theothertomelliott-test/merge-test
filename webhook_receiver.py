@@ -631,18 +631,35 @@ def get_build_counts():
                             if action_branch and 'gh-readonly-queue' in action_branch:
                                 display_branch = action_branch.replace('refs/heads/', '')
                             else:
-                                # Fallback to the build counts to find the merge queue branch
+                                # Fallback: find the merge queue branch with closest timestamp to this action
+                                action_timestamp = action.get('timestamp', '')
+                                best_branch = f"gh-readonly-queue/main/pr-{pr_id}"
+                                min_time_diff = float('inf')
+                                
+                                # Look through all build counts to find the best match
                                 for build_key in dict(build_counts.items()).keys():
-                                    if f'pr-{pr_id}-' in build_key and 'gh-readonly-queue' in build_key:
-                                        # Extract just the branch name, remove any _build_X suffix
-                                        branch_name = build_key.replace('refs/heads/', '')
-                                        if '_build_' in branch_name:
-                                            branch_name = branch_name.split('_build_')[0]
-                                        display_branch = branch_name
-                                        break
-                                else:
-                                    # Final fallback
-                                    display_branch = f"gh-readonly-queue/main/pr-{pr_id}"
+                                    if f'pr-{pr_id}-' in build_key and 'gh-readonly-queue' in build_key and '_build_' in build_key:
+                                        # Extract clean branch name
+                                        clean_branch = build_key.replace('refs/heads/', '')
+                                        if '_build_' in clean_branch:
+                                            clean_branch = clean_branch.split('_build_')[0]
+                                        
+                                        # Get the build info to compare timestamps
+                                        build_info_key = f"{clean_branch}_build_1"
+                                        if build_info_key in build_counts_dict:
+                                            try:
+                                                build_info = json.loads(build_counts_dict[build_info_key])
+                                                build_timestamp = build_info.get('timestamp', '')
+                                                if build_timestamp:
+                                                    # Simple timestamp comparison (just for finding closest match)
+                                                    time_diff = abs(hash(build_timestamp) - hash(action_timestamp))
+                                                    if time_diff < min_time_diff:
+                                                        min_time_diff = time_diff
+                                                        best_branch = clean_branch
+                                            except:
+                                                pass
+                                
+                                display_branch = best_branch
                         
                         action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({final_status})"
                         
