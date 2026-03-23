@@ -632,47 +632,41 @@ def get_build_counts():
                                 break
                         
                         if is_merge_queue_run:
-                            # For merge queue runs, try to get the actual branch name from the action data
-                            # The workflow webhook should have captured the actual merge queue branch name
-                            action_branch = action.get('branch', '')
-                            if action_branch and 'gh-readonly-queue' in action_branch:
-                                display_branch = action_branch.replace('refs/heads/', '')
-                            else:
-                                # Fallback: find the merge queue branch by matching workflow run ID
-                                # Extract run_id from action string if not directly available
-                                action_run_id = action.get('run_id', '')
-                                if not action_run_id:
-                                    # Extract from action string like "workflow_completed_123456789"
-                                    action_str = action.get('action', '')
-                                    if '_' in action_str:
-                                        parts = action_str.split('_')
-                                        if len(parts) >= 3:
-                                            action_run_id = parts[-1]
-                                
-                                best_branch = f"gh-readonly-queue/main/pr-{pr_id}"
-                                
-                                # Look through all build counts to find matching workflow run ID
-                                for build_key in dict(build_counts.items()).keys():
-                                    if f'pr-{pr_id}-' in build_key and 'gh-readonly-queue' in build_key and '_build_' in build_key:
-                                        # Extract clean branch name
-                                        clean_branch = build_key.replace('refs/heads/', '')
-                                        if '_build_' in clean_branch:
-                                            clean_branch = clean_branch.split('_build_')[0]
-                                        
-                                        # Get the build info to compare workflow run IDs
-                                        build_info_key = f"{clean_branch}_build_1"
-                                        if build_info_key in build_counts_dict:
-                                            try:
-                                                build_info = json.loads(build_counts_dict[build_info_key])
-                                                build_run_id = build_info.get('workflow_run_id', '')
-                                                # If workflow run IDs match, this is the right branch
-                                                if build_run_id and build_run_id == action_run_id:
-                                                    best_branch = clean_branch
-                                                    break
-                                            except:
-                                                pass
-                                
-                                display_branch = best_branch
+                            # For merge queue runs, always show the merge queue branch name with hash
+                            # Never show the original PR branch name for merge queue runs
+                            action_run_id = action.get('run_id', '')
+                            if not action_run_id:
+                                # Extract from action string like "workflow_completed_123456789"
+                                action_str = action.get('action', '')
+                                if '_' in action_str:
+                                    parts = action_str.split('_')
+                                    if len(parts) >= 3:
+                                        action_run_id = parts[-1]
+                            
+                            best_branch = f"gh-readonly-queue/main/pr-{pr_id}"
+                            
+                            # Look through all build counts to find matching workflow run ID
+                            for build_key in dict(build_counts.items()).keys():
+                                if f'pr-{pr_id}-' in build_key and 'gh-readonly-queue' in build_key and '_build_' in build_key:
+                                    # Extract clean branch name
+                                    clean_branch = build_key.replace('refs/heads/', '')
+                                    if '_build_' in clean_branch:
+                                        clean_branch = clean_branch.split('_build_')[0]
+                                    
+                                    # Get the build info to compare workflow run IDs
+                                    build_info_key = f"{clean_branch}_build_1"
+                                    if build_info_key in build_counts_dict:
+                                        try:
+                                            build_info = json.loads(build_counts_dict[build_info_key])
+                                            build_run_id = build_info.get('workflow_run_id', '')
+                                            # If workflow run IDs match, this is the right branch
+                                            if build_run_id and build_run_id == action_run_id:
+                                                best_branch = clean_branch
+                                                break
+                                        except:
+                                            pass
+                            
+                            display_branch = best_branch
                         
                         action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({final_status})"
                         
