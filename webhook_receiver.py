@@ -607,11 +607,31 @@ def get_build_counts():
                         # Show workflow with final status
                         final_status = conclusion if conclusion in ['success', 'failure', 'cancelled', 'timed_out'] else status
                         head_branch = pr_data.get("head", {}).get("ref", "unknown")
+                        
+                        # Determine if this is a merge queue run
+                        # Merge queue runs happen after the enqueue action
+                        # We can detect this by looking at the sequence of actions
+                        display_branch = head_branch
+                        
+                        # Check if this is a merge queue run by looking at the action sequence
+                        # Find the index of current action and check if there was an enqueue before it
+                        current_action_index = actions.index(action)
+                        is_merge_queue_run = False
+                        
+                        for i in range(current_action_index):
+                            prev_action = actions[i]
+                            if prev_action.get('action') == 'enqueued':
+                                is_merge_queue_run = True
+                                break
+                        
+                        if is_merge_queue_run:
+                            display_branch = f"gh-readonly-queue/main/pr-{pr_id}"
+                        
                         action_line = f"  {action['timestamp']} - workflow_{action_type} by {action['user']} ({final_status})"
                         
                         if conclusion:
                             action_line += f" - {conclusion}"
-                        action_line += f") [{workflow_name}] - {head_branch}"
+                        action_line += f") [{workflow_name}] - {display_branch}"
                     else:  # job actions
                         job_name = action.get('job_name', 'unknown')
                         status = action.get('job_status', 'unknown')
