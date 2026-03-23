@@ -131,12 +131,12 @@ jobs:
           if [[ "${{ github.event_name }}" == "merge_group" ]]; then
             # For merge groups, get commits in the merge group
             echo "🔍 Merge group detected, getting commits..."
-            COMMITS=$(git log --pretty=format:'"%s"' $BASE_BRANCH..$BRANCH_NAME | head -10)
+            COMMITS=$(git log --pretty=format:'"%s"' origin/$BASE_BRANCH..origin/$BRANCH_NAME | head -10)
             echo "🔍 Merge group commits found: $COMMITS"
           else
             # For individual PRs, get commits in the PR
             echo "🔍 PR detected, getting commits..."
-            COMMITS=$(git log --pretty=format:'"%s"' $BASE_BRANCH..$BRANCH_NAME | head -10)
+            COMMITS=$(git log --pretty=format:'"%s"' origin/$BASE_BRANCH..origin/$BRANCH_NAME | head -10)
             echo "🔍 PR commits found: $COMMITS"
           fi
           
